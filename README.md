@@ -14,6 +14,26 @@ OfferForge 是一个本地优先的 Web 应用，用于把 Python、SQL、API/py
 - 默认本机访问配置，以及按启动命令选择局域网监听。
 - pytest 基础测试，测试数据库使用临时 SQLite 文件。
 
+## 技术栈
+
+- Python 3.11+
+- FastAPI
+- Pydantic v2
+- SQLAlchemy 2.x
+- SQLite
+- pytest
+- httpx
+
+## 项目目录
+
+```text
+app/        FastAPI 应用、API、配置、数据库、模型、Schema、Repository、Service
+tests/      自动化测试
+data/       本地 SQLite 数据目录
+docs/       项目文档和验收记录
+scripts/    后续脚本预留目录
+```
+
 ## 当前未完成范围
 
 - 未实现复习调度算法。
@@ -99,6 +119,16 @@ http://192.168.1.8:8000/docs
 
 电脑上的 OfferForge 服务必须保持运行。第一次监听局域网地址时，Windows 防火墙可能弹出授权提示，需要允许 Python 在当前可信私人网络中通信。
 
+## 数据保存位置
+
+正式运行时 SQLite 数据库默认保存到：
+
+```text
+data/offerforge.db
+```
+
+该文件是本地运行数据，不提交到 Git。测试会使用临时 SQLite 数据库，不写入正式数据库。
+
 ## 安全说明
 
 当前服务没有登录鉴权，只建议在可信的家庭或私人局域网中使用。不要在公共 Wi-Fi 中开放，不要在路由器中设置公网端口映射，也不要把服务直接暴露到公网。
@@ -113,6 +143,23 @@ python -m pytest -q
 ```
 
 测试会覆盖临时 SQLite 数据库路径，不会写入默认正式数据库 `data/offerforge.db`。
+
+## API
+
+本机启动后访问：
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+当前提供：
+
+- `GET /api/v1/health`
+- `POST /api/v1/cards`
+- `GET /api/v1/cards`
+- `GET /api/v1/cards/{card_id}`
+- `PATCH /api/v1/cards/{card_id}`
+- `DELETE /api/v1/cards/{card_id}`
 
 ## 移动端兼容预留原则
 
