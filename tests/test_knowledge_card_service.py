@@ -61,8 +61,23 @@ def make_repository_mock() -> Mock:
     return Mock(spec=KnowledgeCardRepository)
 
 
-def make_integrity_error() -> IntegrityError:
-    return IntegrityError("statement", {"title": "duplicate"}, Exception("unique"))
+def make_unique_title_integrity_error() -> IntegrityError:
+    return IntegrityError(
+        "statement",
+        {"title": "duplicate"},
+        Exception(
+            "UNIQUE constraint failed: "
+            "knowledge_cards.category, knowledge_cards.title"
+        ),
+    )
+
+
+def make_other_integrity_error() -> IntegrityError:
+    return IntegrityError(
+        "statement",
+        {"title": "duplicate"},
+        Exception("CHECK constraint failed: unrelated_constraint"),
+    )
 
 
 def test_create_card_calls_repository_when_no_duplicate() -> None:
@@ -101,7 +116,7 @@ def test_create_card_converts_integrity_error_and_keeps_cause() -> None:
     repository = make_repository_mock()
     service = KnowledgeCardService(repository)
     data = make_card_create()
-    integrity_error = make_integrity_error()
+    integrity_error = make_unique_title_integrity_error()
     repository.exists_by_category_and_title.return_value = False
     repository.create.side_effect = integrity_error
 
@@ -125,6 +140,20 @@ def test_create_card_does_not_swallow_unrelated_exceptions() -> None:
         service.create_card(data)
 
     assert exc_info.value is unrelated_error
+
+
+def test_create_card_does_not_convert_other_integrity_errors() -> None:
+    repository = make_repository_mock()
+    service = KnowledgeCardService(repository)
+    data = make_card_create()
+    integrity_error = make_other_integrity_error()
+    repository.exists_by_category_and_title.return_value = False
+    repository.create.side_effect = integrity_error
+
+    with pytest.raises(IntegrityError) as exc_info:
+        service.create_card(data)
+
+    assert exc_info.value is integrity_error
 
 
 def test_get_card_returns_existing_card() -> None:
@@ -322,7 +351,7 @@ def test_update_card_converts_integrity_error_and_keeps_cause() -> None:
     repository = make_repository_mock()
     service = KnowledgeCardService(repository)
     card = make_card(card_id=12)
-    integrity_error = make_integrity_error()
+    integrity_error = make_unique_title_integrity_error()
     repository.get_by_id.return_value = card
     repository.exists_by_category_and_title.return_value = False
     repository.update.side_effect = integrity_error
@@ -348,6 +377,20 @@ def test_update_card_does_not_swallow_unrelated_exceptions() -> None:
         service.update_card(card.id, KnowledgeCardUpdate(difficulty=DifficultyLevel.HARD))
 
     assert exc_info.value is unrelated_error
+
+
+def test_update_card_does_not_convert_other_integrity_errors() -> None:
+    repository = make_repository_mock()
+    service = KnowledgeCardService(repository)
+    card = make_card(card_id=13)
+    integrity_error = make_other_integrity_error()
+    repository.get_by_id.return_value = card
+    repository.update.side_effect = integrity_error
+
+    with pytest.raises(IntegrityError) as exc_info:
+        service.update_card(card.id, KnowledgeCardUpdate(difficulty=DifficultyLevel.HARD))
+
+    assert exc_info.value is integrity_error
 
 
 def test_delete_card_calls_repository_delete_when_card_exists() -> None:

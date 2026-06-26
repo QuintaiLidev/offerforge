@@ -17,6 +17,14 @@ from app.services.exceptions import (
 )
 
 
+def _is_category_title_unique_constraint_error(exc: IntegrityError) -> bool:
+    message = str(exc.orig) if exc.orig is not None else str(exc)
+    return (
+        "UNIQUE constraint failed: "
+        "knowledge_cards.category, knowledge_cards.title"
+    ) in message
+
+
 class KnowledgeCardService:
     def __init__(self, repository: KnowledgeCardRepository) -> None:
         self.repository = repository
@@ -28,7 +36,9 @@ class KnowledgeCardService:
         try:
             return self.repository.create(data)
         except IntegrityError as exc:
-            raise DuplicateKnowledgeCardError(data.category, data.title) from exc
+            if _is_category_title_unique_constraint_error(exc):
+                raise DuplicateKnowledgeCardError(data.category, data.title) from exc
+            raise
 
     def get_card(self, card_id: int) -> KnowledgeCard:
         card = self.repository.get_by_id(card_id)
@@ -88,7 +98,9 @@ class KnowledgeCardService:
         try:
             return self.repository.update(card, data)
         except IntegrityError as exc:
-            raise DuplicateKnowledgeCardError(final_category, final_title) from exc
+            if _is_category_title_unique_constraint_error(exc):
+                raise DuplicateKnowledgeCardError(final_category, final_title) from exc
+            raise
 
     def delete_card(self, card_id: int) -> None:
         card = self.get_card(card_id)

@@ -8,15 +8,19 @@ OfferForge 是一个本地优先的 Web 应用，用于把 Python、SQL、API/py
 - FastAPI 最小应用骨架。
 - `/api/v1/health` 健康检查接口。
 - SQLAlchemy 2.x SQLite 连接、SessionLocal、`get_db` 依赖、外键开启和初始化函数。
+- KnowledgeCard / PracticeAttempt 数据模型。
+- KnowledgeCard Pydantic Schema、Repository、Service。
+- KnowledgeCard REST CRUD API，可通过 Swagger / OpenAPI 创建、查询、筛选、修改和删除知识卡。
 - 默认本机访问配置，以及按启动命令选择局域网监听。
 - pytest 基础测试，测试数据库使用临时 SQLite 文件。
 
 ## 当前未完成范围
 
-- 未实现知识卡 CRUD。
 - 未实现复习调度算法。
-- 未实现判题器、评分器或业务服务逻辑。
+- 未实现今日任务、判题器和评分器。
 - 未实现正式业务前端或手机业务页面。
+- 未实现 Markdown 初始化题库或 Markdown 导入。
+- 未实现 PracticeAttempt API。
 - 未实现账户系统、云同步、公网部署、PWA、Tailscale、内网穿透、Docker、Redis、Celery 或消息队列。
 - 未实现公网远程访问。
 
@@ -52,6 +56,14 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 `127.0.0.1` 只允许当前电脑访问，这是默认推荐的开发方式。
+
+启动后访问：
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+当前 `/docs` 可以操作 KnowledgeCard CRUD API。
 
 同一 Wi-Fi 下允许手机访问：
 
