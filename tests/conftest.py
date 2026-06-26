@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 import os
 import shutil
 import tempfile
 from pathlib import Path
 
 import pytest
+from sqlalchemy.orm import Session
 
 _TEST_DB_DIR: Path | None = None
 _TEST_DB_PATH: Path | None = None
@@ -45,6 +47,23 @@ def test_db_path() -> Path:
     if _TEST_DB_PATH is None:
         raise RuntimeError("Test database path was not configured.")
     return _TEST_DB_PATH
+
+
+@pytest.fixture()
+def db_session() -> Generator[Session, None, None]:
+    from app.db.base import Base
+    from app.db.init_db import init_db
+    from app.db.session import SessionLocal, engine
+
+    Base.metadata.drop_all(bind=engine)
+    init_db()
+
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+        Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture(scope="session")
