@@ -51,6 +51,22 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "answer_text" in response.text
 
 
+async def test_root_redirects_to_app(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    monkeypatch.delenv("OFFERFORGE_AUTH_ENABLED", raising=False)
+    monkeypatch.delenv("OFFERFORGE_AUTH_USERNAME", raising=False)
+    monkeypatch.delenv("OFFERFORGE_AUTH_PASSWORD", raising=False)
+    get_settings.cache_clear()
+
+    async for client in make_client():
+        response = await client.get("/")
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/app"
+
+
 async def test_app_page_auth_enabled_protects_app_but_not_health(
     monkeypatch: pytest.MonkeyPatch,
     db_session: Session,
@@ -61,6 +77,7 @@ async def test_app_page_auth_enabled_protects_app_but_not_health(
     get_settings.cache_clear()
 
     async for client in make_client():
+        root = await client.get("/")
         health = await client.get("/api/v1/health")
         app_without_auth = await client.get("/app")
         app_with_auth = await client.get(
@@ -68,6 +85,8 @@ async def test_app_page_auth_enabled_protects_app_but_not_health(
             auth=("offerforge", "test-secret"),
         )
 
+    assert root.status_code == 307
+    assert root.headers["location"] == "/app"
     assert health.status_code == 200
     assert app_without_auth.status_code == 401
     assert app_without_auth.headers["www-authenticate"] == "Basic"

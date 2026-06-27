@@ -153,6 +153,8 @@ data/offerforge.db
 
 详细部署说明见 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)。
 
+Cloud MVP smoke test record: [`docs/CLOUD_SMOKE_TEST.md`](docs/CLOUD_SMOKE_TEST.md)。
+
 ## 安全说明
 
 HTTP Basic Auth 只是私人 MVP 的最小保护，不是完整账号系统。不要把密码写进代码，不要提交 `.env`，不要公开分享访问地址和密码。当前没有多用户账号、注册、登录会话或权限管理。

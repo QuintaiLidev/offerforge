@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.openapi.docs import get_swagger_ui_html
-from starlette.responses import HTMLResponse, JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from app.api.auth import require_basic_auth
 from app.api.router import api_router
@@ -34,8 +34,15 @@ def create_app() -> FastAPI:
         app_page_router,
         dependencies=[Depends(require_basic_auth)],
     )
+    register_root_redirect(application)
     register_documentation_routes(application)
     return application
+
+
+def register_root_redirect(application: FastAPI) -> None:
+    @application.get("/", include_in_schema=False)
+    def redirect_to_app() -> RedirectResponse:
+        return RedirectResponse(url="/app", status_code=307)
 
 
 def register_documentation_routes(application: FastAPI) -> None:

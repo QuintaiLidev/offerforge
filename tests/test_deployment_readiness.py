@@ -48,8 +48,28 @@ def test_readme_links_to_deployment_guide_and_app_path() -> None:
 
     assert "Deployment" in content
     assert "docs/DEPLOYMENT.md" in content
+    assert "docs/CLOUD_SMOKE_TEST.md" in content
     assert "/app" in content
     assert "Basic Auth" in content
+
+
+def test_cloud_smoke_test_record_documents_render_mvp_result() -> None:
+    content = read_text("docs/CLOUD_SMOKE_TEST.md")
+
+    assert "Render" in content
+    assert "GitHub private repo" in content
+    assert "Basic Auth enabled" in content
+    assert "SQLite" in content
+    assert "/api/v1/health" in content
+    assert "/docs" in content
+    assert "/app" in content
+    assert "dont_know" in content
+    assert "with_hint" in content
+    assert "correct_slow" in content
+    assert "correct_explain" in content
+    assert "transfer" in content
+    assert "Cloud MVP smoke test passed" in content
+    assert "password" not in content.lower()
 
 
 def test_gitignore_excludes_secrets_databases_and_runtime_artifacts() -> None:
