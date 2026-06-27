@@ -11,6 +11,7 @@ OfferForge 是一个本地优先的 Web 应用，用于把 Python、SQL、API/py
 - KnowledgeCard / PracticeAttempt 数据模型。
 - KnowledgeCard Pydantic Schema、Repository、Service。
 - KnowledgeCard REST CRUD API，可通过 Swagger / OpenAPI 创建、查询、筛选、修改和删除知识卡。
+- HTTP Basic Auth 最小访问保护，可通过环境变量启用。
 - 默认本机访问配置，以及按启动命令选择局域网监听。
 - pytest 基础测试，测试数据库使用临时 SQLite 文件。
 
@@ -77,6 +78,8 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 `127.0.0.1` 只允许当前电脑访问，这是默认推荐的开发方式。
 
+本地开发默认关闭 Basic Auth，方便快速调试和运行测试。
+
 启动后访问：
 
 ```text
@@ -84,6 +87,19 @@ http://127.0.0.1:8000/docs
 ```
 
 当前 `/docs` 可以操作 KnowledgeCard CRUD API。
+
+开启 Basic Auth：
+
+```powershell
+$env:OFFERFORGE_AUTH_ENABLED="true"
+$env:OFFERFORGE_AUTH_USERNAME="offerforge"
+$env:OFFERFORGE_AUTH_PASSWORD="请换成你自己的强密码"
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+如果 `OFFERFORGE_AUTH_ENABLED=true`，但没有设置用户名或密码，应用会拒绝启动。云端部署必须开启 Basic Auth。
+
+开启后，`/docs`、`/openapi.json` 和业务 API 需要认证；`/api/v1/health` 保持开放，便于健康检查。
 
 同一 Wi-Fi 下允许手机访问：
 
@@ -131,7 +147,11 @@ data/offerforge.db
 
 ## 安全说明
 
-当前服务没有登录鉴权，只建议在可信的家庭或私人局域网中使用。不要在公共 Wi-Fi 中开放，不要在路由器中设置公网端口映射，也不要把服务直接暴露到公网。
+HTTP Basic Auth 只是私人 MVP 的最小保护，不是完整账号系统。不要把密码写进代码，不要提交 `.env`，不要公开分享访问地址和密码。当前没有多用户账号、注册、登录会话或权限管理。
+
+本地开发默认关闭 Basic Auth；云端部署必须设置 `OFFERFORGE_AUTH_ENABLED=true`、`OFFERFORGE_AUTH_USERNAME` 和 `OFFERFORGE_AUTH_PASSWORD`。
+
+只建议在可信的家庭、私人局域网或受保护的私人云端环境中使用。不要在公共 Wi-Fi 中开放，不要在路由器中设置公网端口映射，也不要把未开启认证的服务暴露到公网。
 
 项目当前不需要 CORS 配置：手机端和电脑端都会通过同一个 FastAPI 服务访问。
 

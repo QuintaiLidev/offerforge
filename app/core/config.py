@@ -5,7 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Mapping
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parents[2]
 DEFAULT_DATABASE_PATH: Path = PROJECT_ROOT / "data" / "offerforge.db"
@@ -20,6 +20,9 @@ class Settings(BaseModel):
     testing: bool = False
     host: str = "127.0.0.1"
     port: int = 8000
+    auth_enabled: bool = False
+    auth_username: str | None = None
+    auth_password: str | None = None
 
     @field_validator("database_path", mode="after")
     @classmethod
@@ -27,6 +30,17 @@ class Settings(BaseModel):
         if value.is_absolute():
             return value
         return (PROJECT_ROOT / value).resolve()
+
+    @model_validator(mode="after")
+    def validate_auth_credentials(self) -> "Settings":
+        if self.auth_enabled and (
+            not self.auth_username or not self.auth_password
+        ):
+            raise ValueError(
+                "Auth is enabled but OFFERFORGE_AUTH_USERNAME or "
+                "OFFERFORGE_AUTH_PASSWORD is missing."
+            )
+        return self
 
     @property
     def database_url(self) -> str:
@@ -63,6 +77,9 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         testing=_read_bool(env.get("OFFERFORGE_TESTING"), False),
         host=env.get("OFFERFORGE_HOST", "127.0.0.1"),
         port=_read_int(env.get("OFFERFORGE_PORT"), 8000),
+        auth_enabled=_read_bool(env.get("OFFERFORGE_AUTH_ENABLED"), False),
+        auth_username=env.get("OFFERFORGE_AUTH_USERNAME") or None,
+        auth_password=env.get("OFFERFORGE_AUTH_PASSWORD") or None,
     )
 
 
