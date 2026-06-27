@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import exists, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -86,6 +88,55 @@ class KnowledgeCardRepository:
             .where(*filters)
             .order_by(KnowledgeCard.created_at.desc(), KnowledgeCard.id.desc())
             .offset(offset)
+            .limit(limit)
+        )
+        items = list(self.session.scalars(items_statement).all())
+        return items, total
+
+    def list_due_for_review(
+        self,
+        now: datetime,
+        *,
+        limit: int = 10,
+    ) -> tuple[list[KnowledgeCard], int]:
+        if limit < 0:
+            raise ValueError("limit must be non-negative.")
+
+        filters = [
+            KnowledgeCard.is_active.is_(True),
+            KnowledgeCard.next_review_at <= now,
+        ]
+        total_statement = select(func.count()).select_from(KnowledgeCard).where(*filters)
+        total = self.session.scalar(total_statement) or 0
+
+        items_statement = (
+            select(KnowledgeCard)
+            .where(*filters)
+            .order_by(KnowledgeCard.next_review_at.asc(), KnowledgeCard.id.asc())
+            .limit(limit)
+        )
+        items = list(self.session.scalars(items_statement).all())
+        return items, total
+
+    def list_new_for_review(
+        self,
+        *,
+        limit: int = 10,
+    ) -> tuple[list[KnowledgeCard], int]:
+        if limit < 0:
+            raise ValueError("limit must be non-negative.")
+
+        filters = [
+            KnowledgeCard.is_active.is_(True),
+            KnowledgeCard.mastery_level == MasteryLevel.NEW,
+        ]
+        total_statement = select(func.count()).select_from(KnowledgeCard).where(*filters)
+        total = self.session.scalar(total_statement) or 0
+
+        items_statement = (
+            select(KnowledgeCard)
+            .where(*filters)
+            .order_by(KnowledgeCard.created_at.asc(), KnowledgeCard.id.asc())
             .limit(limit)
         )
         items = list(self.session.scalars(items_statement).all())

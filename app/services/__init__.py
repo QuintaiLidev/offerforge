@@ -7,11 +7,13 @@ from app.services.exceptions import (
 )
 from app.services.knowledge_card import KnowledgeCardService
 from app.services.practice_attempt import PracticeAttemptService
+from app.services.review import ReviewService
 
 __all__ = [
     "DuplicateKnowledgeCardError",
     "KnowledgeCardNotFoundError",
     "KnowledgeCardService",
     "PracticeAttemptService",
+    "ReviewService",
     "ServiceError",
 ]

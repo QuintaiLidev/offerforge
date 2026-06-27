@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -161,6 +162,70 @@ def test_list_supports_combined_filters(db_session: Session) -> None:
 
     assert total == 1
     assert items == [target]
+
+
+def test_list_due_for_review_filters_active_due_cards_and_orders_stably(
+    db_session: Session,
+) -> None:
+    repository = make_repository(db_session)
+    now = datetime(2026, 6, 27, 12, 0, 0)
+    due_later = repository.create(make_card_create(title="Due later"))
+    due_earlier = repository.create(make_card_create(title="Due earlier"))
+    due_exact = repository.create(make_card_create(title="Due exact"))
+    future = repository.create(make_card_create(title="Future review"))
+    inactive_due = repository.create(make_card_create(title="Inactive due"))
+    unscheduled = repository.create(make_card_create(title="Unscheduled"))
+
+    due_later.next_review_at = now - timedelta(hours=1)
+    due_earlier.next_review_at = now - timedelta(days=1)
+    due_exact.next_review_at = now
+    future.next_review_at = now + timedelta(seconds=1)
+    inactive_due.next_review_at = now - timedelta(days=2)
+    inactive_due.is_active = False
+    unscheduled.next_review_at = None
+    db_session.commit()
+
+    items, total = repository.list_due_for_review(now, limit=2)
+
+    assert total == 3
+    assert [card.id for card in items] == [due_earlier.id, due_later.id]
+
+
+def test_list_new_for_review_filters_active_new_cards_and_orders_stably(
+    db_session: Session,
+) -> None:
+    repository = make_repository(db_session)
+    older_new = repository.create(make_card_create(title="Older new"))
+    newer_new = repository.create(make_card_create(title="Newer new"))
+    familiar = repository.create(make_card_create(title="Familiar card"))
+    inactive_new = repository.create(make_card_create(title="Inactive new"))
+
+    older_new.created_at = datetime(2026, 6, 20, 9, 0, 0)
+    newer_new.created_at = datetime(2026, 6, 21, 9, 0, 0)
+    familiar.mastery_level = MasteryLevel.FAMILIAR
+    familiar.created_at = datetime(2026, 6, 19, 9, 0, 0)
+    inactive_new.is_active = False
+    inactive_new.created_at = datetime(2026, 6, 18, 9, 0, 0)
+    db_session.commit()
+
+    items, total = repository.list_new_for_review(limit=1)
+
+    assert total == 2
+    assert items == [older_new]
+
+
+@pytest.mark.parametrize("method_name", ["list_due_for_review", "list_new_for_review"])
+def test_review_query_methods_reject_negative_limit(
+    db_session: Session,
+    method_name: str,
+) -> None:
+    repository = make_repository(db_session)
+
+    with pytest.raises(ValueError):
+        if method_name == "list_due_for_review":
+            repository.list_due_for_review(datetime(2026, 6, 27, 12, 0, 0), limit=-1)
+        else:
+            repository.list_new_for_review(limit=-1)
 
 
 def test_keyword_search_matches_title_core_knowledge_and_question(
