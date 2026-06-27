@@ -109,6 +109,16 @@ class KnowledgeCardRepository:
 
         return card
 
+    def save(self, card: KnowledgeCard) -> KnowledgeCard:
+        try:
+            self.session.commit()
+            self.session.refresh(card)
+        except SQLAlchemyError:
+            self.session.rollback()
+            raise
+
+        return card
+
     def delete(self, card: KnowledgeCard) -> None:
         self.session.delete(card)
 

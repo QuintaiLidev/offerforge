@@ -239,6 +239,22 @@ def test_update_changes_only_provided_fields_and_persists(
     assert persisted.difficulty is DifficultyLevel.HARD
 
 
+def test_save_persists_direct_card_changes(db_session: Session) -> None:
+    repository = make_repository(db_session)
+    card = repository.create(make_card_create())
+
+    card.consecutive_correct_count = 2
+    card.mastery_level = MasteryLevel.MASTERED
+    saved = repository.save(card)
+
+    assert saved.consecutive_correct_count == 2
+    assert saved.mastery_level is MasteryLevel.MASTERED
+    persisted = repository.get_by_id(card.id)
+    assert persisted is not None
+    assert persisted.consecutive_correct_count == 2
+    assert persisted.mastery_level is MasteryLevel.MASTERED
+
+
 def test_delete_removes_card_and_cascades_attempts(db_session: Session) -> None:
     repository = make_repository(db_session)
     card = repository.create(make_card_create())

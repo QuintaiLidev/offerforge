@@ -26,3 +26,5 @@ data/*.db-*
 .idea/
 .agents/
 .codex/
+
+.pytest-tmp/
