@@ -145,6 +145,14 @@ data/offerforge.db
 
 该文件是本地运行数据，不提交到 Git。测试会使用临时 SQLite 数据库，不写入正式数据库。
 
+## Deployment
+
+本项目支持本地运行和私人云端部署。云端部署前必须配置 Basic Auth，并把 SQLite 数据库放到持久化磁盘或 volume。
+
+手机复习页面路径：`/app`。
+
+详细部署说明见 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)。
+
 ## 安全说明
 
 HTTP Basic Auth 只是私人 MVP 的最小保护，不是完整账号系统。不要把密码写进代码，不要提交 `.env`，不要公开分享访问地址和密码。当前没有多用户账号、注册、登录会话或权限管理。
