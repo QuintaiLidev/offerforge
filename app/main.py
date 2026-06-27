@@ -11,6 +11,7 @@ from app.api.auth import require_basic_auth
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.db.init_db import init_db
+from app.web.app_page import router as app_page_router
 
 
 @asynccontextmanager
@@ -29,6 +30,10 @@ def create_app() -> FastAPI:
         openapi_url=None,
     )
     application.include_router(api_router, prefix=settings.api_v1_prefix)
+    application.include_router(
+        app_page_router,
+        dependencies=[Depends(require_basic_auth)],
+    )
     register_documentation_routes(application)
     return application
 
