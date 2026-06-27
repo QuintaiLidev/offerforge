@@ -10,6 +10,7 @@ from app.schemas.knowledge_card import (
 )
 from app.schemas.practice_attempt import (
     PracticeAttemptBase,
+    PracticeAttemptCompleteResponse,
     PracticeAttemptCreate,
     PracticeAttemptRead,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "KnowledgeCardRead",
     "KnowledgeCardUpdate",
     "PracticeAttemptBase",
+    "PracticeAttemptCompleteResponse",
     "PracticeAttemptCreate",
     "PracticeAttemptRead",
 ]

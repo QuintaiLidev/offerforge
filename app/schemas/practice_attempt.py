@@ -6,6 +6,7 @@ from pydantic import Field
 
 from app.models.enums import PracticeRating
 from app.schemas.common import SchemaModel
+from app.schemas.knowledge_card import KnowledgeCardRead
 
 
 class PracticeAttemptBase(SchemaModel):
@@ -27,3 +28,8 @@ class PracticeAttemptCreate(PracticeAttemptBase):
 class PracticeAttemptRead(PracticeAttemptBase):
     id: int
     created_at: datetime
+
+
+class PracticeAttemptCompleteResponse(SchemaModel):
+    attempt: PracticeAttemptRead
+    card: KnowledgeCardRead
