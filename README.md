@@ -186,10 +186,13 @@ http://127.0.0.1:8000/docs
 
 - `GET /api/v1/health`
 - `POST /api/v1/cards`
+- `POST /api/v1/cards/bulk`
 - `GET /api/v1/cards`
 - `GET /api/v1/cards/{card_id}`
 - `PATCH /api/v1/cards/{card_id}`
 - `DELETE /api/v1/cards/{card_id}`
+
+Bulk card import is available through `POST /api/v1/cards/bulk` with a JSON array body.
 
 ## 移动端兼容预留原则
 

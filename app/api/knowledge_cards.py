@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    Response,
+    status,
+)
 
 from app.api.deps import get_knowledge_card_service
 from app.models.enums import (
@@ -12,6 +21,7 @@ from app.models.enums import (
     QuestionType,
 )
 from app.schemas.knowledge_card import (
+    KnowledgeCardBulkCreateResponse,
     KnowledgeCardCreate,
     KnowledgeCardListResponse,
     KnowledgeCardRead,
@@ -30,6 +40,10 @@ KnowledgeCardServiceDep = Annotated[
     Depends(get_knowledge_card_service),
 ]
 CardIdPath = Annotated[int, Path(gt=0)]
+BulkCreateBody = Annotated[
+    list[KnowledgeCardCreate],
+    Body(min_length=1, max_length=100),
+]
 
 
 @router.post(
@@ -53,6 +67,30 @@ def create_knowledge_card(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
+
+
+@router.post(
+    "/bulk",
+    response_model=KnowledgeCardBulkCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Bulk create knowledge cards",
+    responses={
+        status.HTTP_409_CONFLICT: {"description": "Duplicate knowledge card title"},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Validation error"},
+    },
+)
+def bulk_create_knowledge_cards(
+    data: BulkCreateBody,
+    service: KnowledgeCardServiceDep,
+) -> KnowledgeCardBulkCreateResponse:
+    try:
+        items = service.create_cards(data)
+    except DuplicateKnowledgeCardError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return KnowledgeCardBulkCreateResponse(created_count=len(items), items=items)
 
 
 @router.get(

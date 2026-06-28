@@ -12,7 +12,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_knowledge_card_service
-from app.main import app
+from app.core.config import get_settings
+from app.main import app, create_app
 from app.models import KnowledgeCard
 from app.models.enums import (
     DifficultyLevel,
@@ -48,6 +49,36 @@ def card_payload(**overrides: Any) -> dict[str, Any]:
     }
     payload.update(overrides)
     return payload
+
+
+def bulk_card_payloads() -> list[dict[str, Any]]:
+    return [
+        card_payload(
+            title="Bulk pytest fixture",
+            category="pytest",
+            difficulty="easy",
+            question_type="knowledge",
+            core_knowledge="fixture prepares reusable test state.",
+            question="What problem does a pytest fixture solve?",
+            reference_answer=(
+                "It prepares test preconditions, reusable data, and resource "
+                "lifecycles."
+            ),
+            tags=["pytest", "fixture"],
+            source_reference="manual-week1",
+        ),
+        card_payload(
+            title="Bulk SQL join",
+            category="sql",
+            difficulty="medium",
+            question_type="sql",
+            core_knowledge="JOIN combines rows from related tables.",
+            question="What does an INNER JOIN return?",
+            reference_answer="It returns rows that match in both joined tables.",
+            tags=["sql", "join"],
+            source_reference="manual-week1",
+        ),
+    ]
 
 
 async def create_card(
@@ -103,6 +134,94 @@ async def test_post_creates_card_and_persists_to_test_database(
 
     count = db_session.scalar(select(func.count()).select_from(KnowledgeCard))
     assert count == 1
+
+
+async def test_post_bulk_creates_cards_and_reviews_can_return_them(
+    client: httpx.AsyncClient,
+) -> None:
+    response = await client.post("/api/v1/cards/bulk", json=bulk_card_payloads())
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["created_count"] == 2
+    assert len(data["items"]) == 2
+    assert [item["title"] for item in data["items"]] == [
+        "Bulk pytest fixture",
+        "Bulk SQL join",
+    ]
+
+    first_id = data["items"][0]["id"]
+    second_id = data["items"][1]["id"]
+    first_detail = await client.get(f"/api/v1/cards/{first_id}")
+    second_detail = await client.get(f"/api/v1/cards/{second_id}")
+    today = await client.get("/api/v1/reviews/today")
+
+    assert first_detail.status_code == 200
+    assert second_detail.status_code == 200
+    assert first_detail.json()["title"] == "Bulk pytest fixture"
+    assert second_detail.json()["title"] == "Bulk SQL join"
+    assert today.status_code == 200
+    today_data = today.json()
+    assert today_data["mode"] == "new"
+    assert {item["id"] for item in today_data["items"]} == {first_id, second_id}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [],
+        [
+            card_payload(title=f"Bulk card {index}", category="python")
+            for index in range(101)
+        ],
+        [
+            card_payload(title="Valid bulk card"),
+            card_payload(title="Invalid bulk card", category="not_a_category"),
+        ],
+    ],
+)
+async def test_post_bulk_invalid_payload_returns_422(
+    client: httpx.AsyncClient,
+    payload: list[dict[str, Any]],
+) -> None:
+    response = await client.post("/api/v1/cards/bulk", json=payload)
+
+    assert response.status_code == 422
+
+
+async def test_post_bulk_auth_enabled_protects_business_api_but_not_health(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    monkeypatch.setenv("OFFERFORGE_AUTH_ENABLED", "true")
+    monkeypatch.setenv("OFFERFORGE_AUTH_USERNAME", "offerforge")
+    monkeypatch.setenv("OFFERFORGE_AUTH_PASSWORD", "test-secret")
+    get_settings.cache_clear()
+
+    application = create_app()
+    transport = httpx.ASGITransport(app=application)
+    async with application.router.lifespan_context(application):
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        ) as auth_client:
+            health = await auth_client.get("/api/v1/health")
+            without_auth = await auth_client.post(
+                "/api/v1/cards/bulk",
+                json=bulk_card_payloads(),
+            )
+            with_auth = await auth_client.post(
+                "/api/v1/cards/bulk",
+                json=bulk_card_payloads(),
+                auth=("offerforge", "test-secret"),
+            )
+
+    assert health.status_code == 200
+    assert without_auth.status_code == 401
+    assert without_auth.headers["www-authenticate"] == "Basic"
+    assert with_auth.status_code == 201
+    assert with_auth.json()["created_count"] == 2
+    get_settings.cache_clear()
 
 
 async def test_post_duplicate_same_category_returns_409(

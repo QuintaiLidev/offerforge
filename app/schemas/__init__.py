@@ -2,6 +2,7 @@
 
 from app.schemas.knowledge_card import (
     KnowledgeCardBase,
+    KnowledgeCardBulkCreateResponse,
     KnowledgeCardCreate,
     KnowledgeCardListItem,
     KnowledgeCardListResponse,
@@ -18,6 +19,7 @@ from app.schemas.review import ReviewMode, ReviewTodayResponse
 
 __all__ = [
     "KnowledgeCardBase",
+    "KnowledgeCardBulkCreateResponse",
     "KnowledgeCardCreate",
     "KnowledgeCardListItem",
     "KnowledgeCardListResponse",

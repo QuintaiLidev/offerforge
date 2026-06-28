@@ -40,6 +40,12 @@ class KnowledgeCardService:
                 raise DuplicateKnowledgeCardError(data.category, data.title) from exc
             raise
 
+    def create_cards(
+        self,
+        items: list[KnowledgeCardCreate],
+    ) -> list[KnowledgeCard]:
+        return [self.create_card(item) for item in items]
+
     def get_card(self, card_id: int) -> KnowledgeCard:
         card = self.repository.get_by_id(card_id)
         if card is None:

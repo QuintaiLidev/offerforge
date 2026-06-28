@@ -146,3 +146,8 @@ class KnowledgeCardListResponse(SchemaModel):
     total: int = Field(ge=0)
     limit: int = Field(ge=0)
     offset: int = Field(ge=0)
+
+
+class KnowledgeCardBulkCreateResponse(SchemaModel):
+    created_count: int = Field(ge=0)
+    items: list[KnowledgeCardRead]
