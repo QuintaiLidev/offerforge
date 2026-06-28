@@ -58,10 +58,11 @@ def create_card(
     db_session: Session,
     *,
     title: str,
+    category: KnowledgeCategory = KnowledgeCategory.PYTHON,
     **overrides: Any,
 ) -> KnowledgeCard:
     repository = KnowledgeCardRepository(db_session)
-    card = repository.create(make_card_create(title=title))
+    card = repository.create(make_card_create(title=title, category=category))
     for field_name, value in overrides.items():
         setattr(card, field_name, value)
     if overrides:
@@ -72,6 +73,10 @@ def create_card(
 
 def item_ids(data: dict[str, Any]) -> list[int]:
     return [item["id"] for item in data["items"]]
+
+
+def item_categories(data: dict[str, Any]) -> list[str]:
+    return [item["category"] for item in data["items"]]
 
 
 async def test_today_returns_due_cards_when_available(
@@ -85,7 +90,7 @@ async def test_today_returns_due_cards_when_available(
         mastery_level=MasteryLevel.LEARNING,
         next_review_at=FIXED_NOW - timedelta(hours=1),
     )
-    create_card(db_session, title="New fallback card")
+    new_card = create_card(db_session, title="New fallback card")
     monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
 
     response = await client.get("/api/v1/reviews/today")
@@ -94,8 +99,8 @@ async def test_today_returns_due_cards_when_available(
     data = response.json()
     assert data["mode"] == "due"
     assert data["limit"] == 10
-    assert data["total"] == 1
-    assert item_ids(data) == [due_card.id]
+    assert data["total"] == 2
+    assert item_ids(data) == [due_card.id, new_card.id]
     assert data["generated_at"] == FIXED_NOW.isoformat()
 
 
@@ -129,7 +134,7 @@ async def test_today_due_condition_includes_equal_now_and_excludes_future(
     assert response.status_code == 200
     data = response.json()
     assert data["mode"] == "due"
-    assert item_ids(data) == [past_due.id, due_now.id]
+    assert set(item_ids(data)) == {past_due.id, due_now.id}
     assert future.id not in item_ids(data)
 
 
@@ -184,30 +189,149 @@ async def test_today_returns_new_cards_when_no_due_cards_exist(
     data = response.json()
     assert data["mode"] == "new"
     assert data["total"] == 2
-    assert item_ids(data) == [older_new.id, newer_new.id]
+    assert set(item_ids(data)) == {older_new.id, newer_new.id}
 
 
-async def test_today_due_cards_prevent_new_fallback(
+async def test_today_due_cards_reaching_limit_prevent_new_fallback(
     client: httpx.AsyncClient,
     db_session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    due_card = create_card(
-        db_session,
-        title="Due wins",
-        mastery_level=MasteryLevel.LEARNING,
-        next_review_at=FIXED_NOW - timedelta(hours=2),
-    )
+    due_cards = [
+        create_card(
+            db_session,
+            title=f"Due wins {index}",
+            category=KnowledgeCategory.PYTHON
+            if index % 2
+            else KnowledgeCategory.SQL,
+            mastery_level=MasteryLevel.LEARNING,
+            next_review_at=FIXED_NOW - timedelta(hours=2),
+        )
+        for index in range(5)
+    ]
     new_card = create_card(db_session, title="New fallback skipped")
     monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
 
-    response = await client.get("/api/v1/reviews/today")
+    response = await client.get("/api/v1/reviews/today", params={"limit": 5})
 
     assert response.status_code == 200
     data = response.json()
     assert data["mode"] == "due"
-    assert item_ids(data) == [due_card.id]
+    assert set(item_ids(data)) == {card.id for card in due_cards}
     assert new_card.id not in item_ids(data)
+
+
+async def test_today_due_cards_are_followed_by_new_cards_when_due_is_short(
+    client: httpx.AsyncClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    due_cards = [
+        create_card(
+            db_session,
+            title="Due Python",
+            category=KnowledgeCategory.PYTHON,
+            mastery_level=MasteryLevel.LEARNING,
+            next_review_at=FIXED_NOW - timedelta(hours=2),
+        ),
+        create_card(
+            db_session,
+            title="Due SQL",
+            category=KnowledgeCategory.SQL,
+            mastery_level=MasteryLevel.LEARNING,
+            next_review_at=FIXED_NOW - timedelta(hours=1),
+        ),
+        create_card(
+            db_session,
+            title="Due Selenium",
+            category=KnowledgeCategory.SELENIUM,
+            mastery_level=MasteryLevel.LEARNING,
+            next_review_at=FIXED_NOW,
+        ),
+    ]
+    new_cards = [
+        create_card(
+            db_session,
+            title=f"New card {index}",
+            category=category,
+        )
+        for index, category in enumerate(
+            [
+                KnowledgeCategory.PYTHON,
+                KnowledgeCategory.SQL,
+                KnowledgeCategory.SELENIUM,
+                KnowledgeCategory.HTTP_API_TESTING,
+                KnowledgeCategory.REAL_BUSINESS_CASE,
+            ]
+        )
+    ]
+    monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
+
+    response = await client.get("/api/v1/reviews/today", params={"limit": 6})
+
+    assert response.status_code == 200
+    data = response.json()
+    ids = item_ids(data)
+    assert data["mode"] == "due"
+    assert set(ids[:3]) == {card.id for card in due_cards}
+    assert set(ids[3:]) <= {card.id for card in new_cards}
+    assert len(ids[3:]) == 3
+
+
+async def test_today_balances_categories_and_is_stable_within_day(
+    client: httpx.AsyncClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    categories = [
+        KnowledgeCategory.PYTHON,
+        KnowledgeCategory.SQL,
+        KnowledgeCategory.SELENIUM,
+        KnowledgeCategory.HTTP_API_TESTING,
+        KnowledgeCategory.REAL_BUSINESS_CASE,
+    ]
+    created_ids: list[int] = []
+    for category in categories:
+        for index in range(3):
+            card = create_card(
+                db_session,
+                title=f"{category.value} card {index}",
+                category=category,
+                created_at=FIXED_NOW + timedelta(seconds=len(created_ids)),
+            )
+            created_ids.append(card.id)
+    monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
+
+    first = await client.get("/api/v1/reviews/today", params={"limit": 10})
+    second = await client.get("/api/v1/reviews/today", params={"limit": 10})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    first_data = first.json()
+    second_data = second.json()
+    assert item_ids(first_data) == item_ids(second_data)
+    assert item_ids(first_data) != created_ids[:10]
+    assert len(set(item_categories(first_data))) == len(categories)
+    assert len(first_data["items"]) == 10
+
+
+async def test_today_single_category_returns_all_candidates_when_under_limit(
+    client: httpx.AsyncClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cards = [
+        create_card(db_session, title=f"Single category {index}")
+        for index in range(3)
+    ]
+    monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
+
+    response = await client.get("/api/v1/reviews/today", params={"limit": 10})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert set(item_ids(data)) == {card.id for card in cards}
+    assert item_categories(data) == ["python", "python", "python"]
 
 
 async def test_today_default_limit_returns_ten_items(

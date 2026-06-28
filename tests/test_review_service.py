@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -12,7 +12,7 @@ from app.models.enums import (
     MasteryLevel,
     QuestionType,
 )
-from app.services import ReviewService
+from app.services.review import ReviewService, balance_cards_by_category
 
 FIXED_NOW = datetime(2026, 6, 27, 12, 0, 0)
 
@@ -21,12 +21,13 @@ def card_response(
     *,
     card_id: int,
     title: str,
+    category: KnowledgeCategory = KnowledgeCategory.PYTHON,
     mastery_level: MasteryLevel = MasteryLevel.NEW,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=card_id,
         title=title,
-        category=KnowledgeCategory.PYTHON,
+        category=category,
         difficulty=DifficultyLevel.MEDIUM,
         question_type=QuestionType.KNOWLEDGE,
         mastery_level=mastery_level,
@@ -39,31 +40,210 @@ def card_response(
     )
 
 
-def test_get_today_reviews_returns_due_cards_without_new_fallback(
+def item_ids(items: list[SimpleNamespace]) -> list[int]:
+    return [item.id for item in items]
+
+
+def test_balance_cards_by_category_round_robins_multiple_categories() -> None:
+    cards = [
+        card_response(card_id=1, title="Python 1"),
+        card_response(card_id=2, title="Python 2"),
+        card_response(card_id=3, title="Python 3"),
+        card_response(card_id=4, title="SQL 1", category=KnowledgeCategory.SQL),
+        card_response(card_id=5, title="SQL 2", category=KnowledgeCategory.SQL),
+        card_response(card_id=6, title="SQL 3", category=KnowledgeCategory.SQL),
+        card_response(
+            card_id=7,
+            title="Selenium 1",
+            category=KnowledgeCategory.SELENIUM,
+        ),
+        card_response(
+            card_id=8,
+            title="Selenium 2",
+            category=KnowledgeCategory.SELENIUM,
+        ),
+    ]
+
+    balanced = balance_cards_by_category(
+        cards,
+        limit=6,
+        today=date(2026, 6, 27),
+    )
+
+    assert item_ids(balanced) != [1, 2, 3, 4, 5, 6]
+    assert len({card.category for card in balanced[:3]}) == 3
+
+
+def test_balance_cards_by_category_is_stable_for_same_day() -> None:
+    cards = [
+        card_response(card_id=1, title="Python 1"),
+        card_response(card_id=2, title="SQL 1", category=KnowledgeCategory.SQL),
+        card_response(
+            card_id=3,
+            title="Selenium 1",
+            category=KnowledgeCategory.SELENIUM,
+        ),
+        card_response(
+            card_id=4,
+            title="API 1",
+            category=KnowledgeCategory.HTTP_API_TESTING,
+        ),
+        card_response(card_id=5, title="Python 2"),
+        card_response(card_id=6, title="SQL 2", category=KnowledgeCategory.SQL),
+        card_response(
+            card_id=7,
+            title="Selenium 2",
+            category=KnowledgeCategory.SELENIUM,
+        ),
+        card_response(
+            card_id=8,
+            title="API 2",
+            category=KnowledgeCategory.HTTP_API_TESTING,
+        ),
+    ]
+
+    first = balance_cards_by_category(cards, limit=8, today=date(2026, 6, 27))
+    second = balance_cards_by_category(cards, limit=8, today=date(2026, 6, 27))
+
+    assert item_ids(first) == item_ids(second)
+
+
+def test_balance_cards_by_category_can_change_across_days() -> None:
+    cards = [
+        card_response(card_id=1, title="Python 1"),
+        card_response(card_id=2, title="SQL 1", category=KnowledgeCategory.SQL),
+        card_response(
+            card_id=3,
+            title="Selenium 1",
+            category=KnowledgeCategory.SELENIUM,
+        ),
+        card_response(
+            card_id=4,
+            title="API 1",
+            category=KnowledgeCategory.HTTP_API_TESTING,
+        ),
+        card_response(card_id=5, title="Python 2"),
+        card_response(card_id=6, title="SQL 2", category=KnowledgeCategory.SQL),
+        card_response(
+            card_id=7,
+            title="Selenium 2",
+            category=KnowledgeCategory.SELENIUM,
+        ),
+        card_response(
+            card_id=8,
+            title="API 2",
+            category=KnowledgeCategory.HTTP_API_TESTING,
+        ),
+    ]
+
+    first = balance_cards_by_category(cards, limit=8, today=date(2026, 6, 27))
+    next_day = balance_cards_by_category(cards, limit=8, today=date(2026, 6, 28))
+
+    assert item_ids(first) != item_ids(next_day)
+
+
+def test_balance_cards_by_category_handles_single_category_and_short_candidates() -> None:
+    cards = [
+        card_response(card_id=1, title="Python 1"),
+        card_response(card_id=2, title="Python 2"),
+        card_response(card_id=3, title="Python 3"),
+    ]
+
+    balanced = balance_cards_by_category(
+        cards,
+        limit=10,
+        today=date(2026, 6, 27),
+    )
+
+    assert len(balanced) == 3
+    assert {card.category for card in balanced} == {KnowledgeCategory.PYTHON}
+
+
+def test_get_today_reviews_returns_only_due_cards_when_due_reaches_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repository = Mock()
-    due_card = card_response(
-        card_id=1,
-        title="Due card",
-        mastery_level=MasteryLevel.LEARNING,
-    )
-    repository.list_due_for_review.return_value = ([due_card], 1)
+    due_cards = [
+        card_response(
+            card_id=index,
+            title=f"Due card {index}",
+            category=KnowledgeCategory.PYTHON
+            if index % 2
+            else KnowledgeCategory.SQL,
+            mastery_level=MasteryLevel.LEARNING,
+        )
+        for index in range(1, 9)
+    ]
+    repository.list_due_for_review.return_value = (due_cards, len(due_cards))
     service = ReviewService(repository, Mock())
     monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
 
-    response = service.get_today_reviews(limit=10)
+    response = service.get_today_reviews(limit=5)
 
     assert response.mode == "due"
-    assert response.items[0].id == due_card.id
-    assert response.total == 1
-    assert response.limit == 10
+    assert len(response.items) == 5
+    assert {item.id for item in response.items} <= {card.id for card in due_cards}
+    assert response.total == 8
+    assert response.limit == 5
     assert response.generated_at == FIXED_NOW
-    repository.list_due_for_review.assert_called_once_with(FIXED_NOW, limit=10)
+    repository.list_due_for_review.assert_called_once_with(FIXED_NOW, limit=5)
     repository.list_new_for_review.assert_not_called()
 
 
-def test_get_today_reviews_falls_back_to_new_cards_when_no_due(
+def test_get_today_reviews_keeps_due_before_new_when_due_is_short(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = Mock()
+    due_cards = [
+        card_response(
+            card_id=1,
+            title="Due Python",
+            category=KnowledgeCategory.PYTHON,
+            mastery_level=MasteryLevel.LEARNING,
+        ),
+        card_response(
+            card_id=2,
+            title="Due SQL",
+            category=KnowledgeCategory.SQL,
+            mastery_level=MasteryLevel.LEARNING,
+        ),
+        card_response(
+            card_id=3,
+            title="Due Selenium",
+            category=KnowledgeCategory.SELENIUM,
+            mastery_level=MasteryLevel.LEARNING,
+        ),
+    ]
+    new_cards = [
+        card_response(
+            card_id=4,
+            title="New Python",
+            category=KnowledgeCategory.PYTHON,
+        ),
+        card_response(card_id=5, title="New SQL", category=KnowledgeCategory.SQL),
+        card_response(
+            card_id=6,
+            title="New API",
+            category=KnowledgeCategory.HTTP_API_TESTING,
+        ),
+    ]
+    repository.list_due_for_review.return_value = (due_cards, len(due_cards))
+    repository.list_new_for_review.return_value = (new_cards, len(new_cards))
+    service = ReviewService(repository, Mock())
+    monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
+
+    response = service.get_today_reviews(limit=6)
+
+    returned_ids = item_ids(response.items)
+    assert response.mode == "due"
+    assert set(returned_ids[:3]) == {1, 2, 3}
+    assert set(returned_ids[3:]) == {4, 5, 6}
+    assert response.total == 6
+    repository.list_due_for_review.assert_called_once_with(FIXED_NOW, limit=6)
+    repository.list_new_for_review.assert_called_once_with(limit=3)
+
+
+def test_get_today_reviews_returns_new_cards_when_no_due(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repository = Mock()
