@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import exists, func, or_, select
+from sqlalchemy import case, exists, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -97,6 +97,28 @@ class KnowledgeCardRepository:
         items = list(self.session.scalars(items_statement).all())
         return items, total
 
+    def list_source_summaries(self) -> list[tuple[str | None, int, int, int]]:
+        active_count = func.sum(
+            case((KnowledgeCard.is_active.is_(True), 1), else_=0)
+        )
+        statement = (
+            select(
+                KnowledgeCard.source_reference,
+                func.count(KnowledgeCard.id),
+                active_count,
+            )
+            .group_by(KnowledgeCard.source_reference)
+            .order_by(KnowledgeCard.source_reference.asc())
+        )
+        rows = self.session.execute(statement).all()
+
+        summaries: list[tuple[str | None, int, int, int]] = []
+        for source_reference, total_count, active_total in rows:
+            total = int(total_count or 0)
+            active = int(active_total or 0)
+            summaries.append((source_reference, total, active, total - active))
+        return summaries
+
     def list_due_for_review(
         self,
         now: datetime,
@@ -173,6 +195,27 @@ class KnowledgeCardRepository:
             raise
 
         return card
+
+    def set_active_by_source_reference(
+        self,
+        source_reference: str,
+        *,
+        is_active: bool,
+    ) -> int:
+        statement = select(KnowledgeCard).where(
+            KnowledgeCard.source_reference == source_reference
+        )
+        cards = list(self.session.scalars(statement).all())
+        for card in cards:
+            card.is_active = is_active
+
+        try:
+            self.session.commit()
+        except SQLAlchemyError:
+            self.session.rollback()
+            raise
+
+        return len(cards)
 
     def delete(self, card: KnowledgeCard) -> None:
         self.session.delete(card)

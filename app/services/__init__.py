@@ -3,6 +3,7 @@
 from app.services.exceptions import (
     DuplicateKnowledgeCardError,
     KnowledgeCardNotFoundError,
+    KnowledgeCardSourceNotFoundError,
     ServiceError,
 )
 from app.services.knowledge_card import KnowledgeCardService
@@ -13,6 +14,7 @@ from app.services.seed import seed_knowledge_cards_if_empty
 __all__ = [
     "DuplicateKnowledgeCardError",
     "KnowledgeCardNotFoundError",
+    "KnowledgeCardSourceNotFoundError",
     "KnowledgeCardService",
     "PracticeAttemptService",
     "ReviewService",

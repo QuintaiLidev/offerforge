@@ -217,6 +217,10 @@ The file contains 95 cards for interview replay, resume projects, debugging, UI 
 
 `data_seed/cards_seed_week1_interview_v4.json` is an upgraded interview-practice seed with more oral reference answers, memory structure, and follow-up defense notes. The v3 seed remains available, and v4 does not automatically overwrite existing online cards. To use v4 online, import it later through bulk import or switch `OFFERFORGE_AUTO_SEED_PATH`, taking care not to mix old and new card sets unintentionally.
 
+## Seed source management
+
+`GET /api/v1/cards/sources` shows card counts by `source_reference`, including total, active, and inactive counts. `PATCH /api/v1/cards/sources/{source_reference}/active` can enable or disable all cards from one source without deleting cards or practice attempts. `GET /api/v1/reviews/today` only returns active cards, while done-today remains a same-day history view. To switch online use toward v4 manually: import `data_seed/cards_seed_week1_interview_v4.json` through `POST /api/v1/cards/bulk`, confirm v3/v4 counts with the sources API, then set `interview-week1-v3` inactive and verify `/app`.
+
 ## Auto seed restore
 
 On startup, OfferForge can auto-import `data_seed/cards_seed_week1_interview_v3.json` when the knowledge card table is empty. This helps restore the 95-card seed set after a Render free-environment redeploy or restart clears SQLite data. Existing cards are never duplicated, and this only restores knowledge cards, not practice attempts or today-done records. Auto seed is best-effort: missing files, validation failures, or import errors are logged and should not block health checks. Set `OFFERFORGE_AUTO_SEED_ON_STARTUP=false` to disable it, or override the file with `OFFERFORGE_AUTO_SEED_PATH`.

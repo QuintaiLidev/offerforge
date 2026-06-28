@@ -13,6 +13,14 @@ class KnowledgeCardNotFoundError(ServiceError):
         super().__init__(f"Knowledge card {card_id} was not found.")
 
 
+class KnowledgeCardSourceNotFoundError(ServiceError):
+    def __init__(self, source_reference: str) -> None:
+        self.source_reference = source_reference
+        super().__init__(
+            f"Knowledge card source '{source_reference}' was not found."
+        )
+
+
 class DuplicateKnowledgeCardError(ServiceError):
     def __init__(self, category: KnowledgeCategory, title: str) -> None:
         self.category = category

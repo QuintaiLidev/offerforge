@@ -10,10 +10,16 @@ from app.models.enums import (
     QuestionType,
 )
 from app.repositories import KnowledgeCardRepository
-from app.schemas.knowledge_card import KnowledgeCardCreate, KnowledgeCardUpdate
+from app.schemas.knowledge_card import (
+    KnowledgeCardCreate,
+    KnowledgeCardSourceActiveUpdateResponse,
+    KnowledgeCardSourceSummary,
+    KnowledgeCardUpdate,
+)
 from app.services.exceptions import (
     DuplicateKnowledgeCardError,
     KnowledgeCardNotFoundError,
+    KnowledgeCardSourceNotFoundError,
 )
 
 
@@ -78,6 +84,41 @@ class KnowledgeCardService:
             question_type=question_type,
             is_active=is_active,
             keyword=keyword,
+        )
+
+    def list_source_summaries(self) -> list[KnowledgeCardSourceSummary]:
+        return [
+            KnowledgeCardSourceSummary(
+                source_reference=source_reference,
+                total_count=total_count,
+                active_count=active_count,
+                inactive_count=inactive_count,
+            )
+            for (
+                source_reference,
+                total_count,
+                active_count,
+                inactive_count,
+            ) in self.repository.list_source_summaries()
+        ]
+
+    def set_active_by_source_reference(
+        self,
+        source_reference: str,
+        *,
+        is_active: bool,
+    ) -> KnowledgeCardSourceActiveUpdateResponse:
+        updated_count = self.repository.set_active_by_source_reference(
+            source_reference,
+            is_active=is_active,
+        )
+        if updated_count == 0:
+            raise KnowledgeCardSourceNotFoundError(source_reference)
+
+        return KnowledgeCardSourceActiveUpdateResponse(
+            source_reference=source_reference,
+            updated_count=updated_count,
+            is_active=is_active,
         )
 
     def update_card(

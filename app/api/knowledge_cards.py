@@ -25,11 +25,15 @@ from app.schemas.knowledge_card import (
     KnowledgeCardCreate,
     KnowledgeCardListResponse,
     KnowledgeCardRead,
+    KnowledgeCardSourceActiveUpdate,
+    KnowledgeCardSourceActiveUpdateResponse,
+    KnowledgeCardSourceSummaryResponse,
     KnowledgeCardUpdate,
 )
 from app.services import (
     DuplicateKnowledgeCardError,
     KnowledgeCardNotFoundError,
+    KnowledgeCardSourceNotFoundError,
     KnowledgeCardService,
 )
 
@@ -40,6 +44,7 @@ KnowledgeCardServiceDep = Annotated[
     Depends(get_knowledge_card_service),
 ]
 CardIdPath = Annotated[int, Path(gt=0)]
+SourceReferencePath = Annotated[str, Path(min_length=1)]
 BulkCreateBody = Annotated[
     list[KnowledgeCardCreate],
     Body(min_length=1, max_length=100),
@@ -129,6 +134,45 @@ def list_knowledge_cards(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get(
+    "/sources",
+    response_model=KnowledgeCardSourceSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List knowledge card source summaries",
+)
+def list_knowledge_card_sources(
+    service: KnowledgeCardServiceDep,
+) -> KnowledgeCardSourceSummaryResponse:
+    return KnowledgeCardSourceSummaryResponse(items=service.list_source_summaries())
+
+
+@router.patch(
+    "/sources/{source_reference}/active",
+    response_model=KnowledgeCardSourceActiveUpdateResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Set active status for a knowledge card source",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Knowledge card source not found"},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Validation error"},
+    },
+)
+def set_knowledge_card_source_active(
+    source_reference: SourceReferencePath,
+    data: KnowledgeCardSourceActiveUpdate,
+    service: KnowledgeCardServiceDep,
+) -> KnowledgeCardSourceActiveUpdateResponse:
+    try:
+        return service.set_active_by_source_reference(
+            source_reference,
+            is_active=data.is_active,
+        )
+    except KnowledgeCardSourceNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get(

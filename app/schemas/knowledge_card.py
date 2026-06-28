@@ -151,3 +151,24 @@ class KnowledgeCardListResponse(SchemaModel):
 class KnowledgeCardBulkCreateResponse(SchemaModel):
     created_count: int = Field(ge=0)
     items: list[KnowledgeCardRead]
+
+
+class KnowledgeCardSourceSummary(SchemaModel):
+    source_reference: str | None
+    total_count: int = Field(ge=0)
+    active_count: int = Field(ge=0)
+    inactive_count: int = Field(ge=0)
+
+
+class KnowledgeCardSourceSummaryResponse(SchemaModel):
+    items: list[KnowledgeCardSourceSummary]
+
+
+class KnowledgeCardSourceActiveUpdate(SchemaModel):
+    is_active: bool
+
+
+class KnowledgeCardSourceActiveUpdateResponse(SchemaModel):
+    source_reference: str
+    updated_count: int = Field(ge=0)
+    is_active: bool
