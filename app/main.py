@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import Depends, FastAPI
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -9,14 +10,19 @@ from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from app.api.auth import require_basic_auth
 from app.api.router import api_router
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.db.init_db import init_db
+from app.db.session import SessionLocal
+from app.services.seed import seed_knowledge_cards_if_empty
 from app.web.app_page import router as app_page_router
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     init_db()
+    run_auto_seed(get_settings())
     yield
 
 
@@ -37,6 +43,15 @@ def create_app() -> FastAPI:
     register_root_redirect(application)
     register_documentation_routes(application)
     return application
+
+
+def run_auto_seed(settings: Settings) -> int:
+    if not settings.auto_seed_on_startup:
+        logger.info("Auto seed disabled.")
+        return 0
+
+    with SessionLocal() as db:
+        return seed_knowledge_cards_if_empty(db, settings.auto_seed_path)
 
 
 def register_root_redirect(application: FastAPI) -> None:

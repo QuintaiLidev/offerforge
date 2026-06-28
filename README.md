@@ -203,6 +203,10 @@ Bulk card import is available through `POST /api/v1/cards/bulk` with a JSON arra
 Week one interview seed cards are available at `data_seed/cards_seed_week1_interview_v3.json`.
 The file contains 95 cards for interview replay, resume projects, debugging, UI automation, Python coding, SQL, Linux, and HR practice. It is designed for import through `POST /api/v1/cards/bulk` and does not contain sensitive information.
 
+## Auto seed restore
+
+On startup, OfferForge can auto-import `data_seed/cards_seed_week1_interview_v3.json` when the knowledge card table is empty. This helps restore the 95-card seed set after a Render free-environment redeploy or restart clears SQLite data. Existing cards are never duplicated, and this only restores knowledge cards, not practice attempts or today-done records. Set `OFFERFORGE_AUTO_SEED_ON_STARTUP=false` to disable it, or override the file with `OFFERFORGE_AUTO_SEED_PATH`.
+
 ## 移动端兼容预留原则
 
 后续正式业务前端使用原生 HTML、CSS、JavaScript。页面采用 mobile-first 或响应式设计，支持常见手机浏览器，按钮和输入区域适合触屏操作，不依赖 hover 才能完成关键操作，不固定桌面端宽度。

@@ -54,6 +54,10 @@ class KnowledgeCardRepository:
         )
         return self.session.scalar(statement)
 
+    def count(self) -> int:
+        statement = select(func.count()).select_from(KnowledgeCard)
+        return self.session.scalar(statement) or 0
+
     def list(
         self,
         *,

@@ -9,6 +9,9 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parents[2]
 DEFAULT_DATABASE_PATH: Path = PROJECT_ROOT / "data" / "offerforge.db"
+DEFAULT_AUTO_SEED_PATH: Path = (
+    PROJECT_ROOT / "data_seed" / "cards_seed_week1_interview_v3.json"
+)
 
 
 class Settings(BaseModel):
@@ -23,10 +26,19 @@ class Settings(BaseModel):
     auth_enabled: bool = False
     auth_username: str | None = None
     auth_password: str | None = None
+    auto_seed_on_startup: bool = True
+    auto_seed_path: Path = DEFAULT_AUTO_SEED_PATH
 
     @field_validator("database_path", mode="after")
     @classmethod
     def make_database_path_absolute(cls, value: Path) -> Path:
+        if value.is_absolute():
+            return value
+        return (PROJECT_ROOT / value).resolve()
+
+    @field_validator("auto_seed_path", mode="after")
+    @classmethod
+    def make_auto_seed_path_absolute(cls, value: Path) -> Path:
         if value.is_absolute():
             return value
         return (PROJECT_ROOT / value).resolve()
@@ -67,6 +79,7 @@ def _read_int(value: str | None, default: int) -> int:
 
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if environ is None else environ
+    testing = _read_bool(env.get("OFFERFORGE_TESTING"), False)
 
     return Settings(
         app_name=env.get("OFFERFORGE_APP_NAME", "OfferForge"),
@@ -74,12 +87,19 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         database_path=Path(
             env.get("OFFERFORGE_DATABASE_PATH", str(DEFAULT_DATABASE_PATH))
         ),
-        testing=_read_bool(env.get("OFFERFORGE_TESTING"), False),
+        testing=testing,
         host=env.get("OFFERFORGE_HOST", "127.0.0.1"),
         port=_read_int(env.get("OFFERFORGE_PORT"), 8000),
         auth_enabled=_read_bool(env.get("OFFERFORGE_AUTH_ENABLED"), False),
         auth_username=env.get("OFFERFORGE_AUTH_USERNAME") or None,
         auth_password=env.get("OFFERFORGE_AUTH_PASSWORD") or None,
+        auto_seed_on_startup=_read_bool(
+            env.get("OFFERFORGE_AUTO_SEED_ON_STARTUP"),
+            not testing,
+        ),
+        auto_seed_path=Path(
+            env.get("OFFERFORGE_AUTO_SEED_PATH", str(DEFAULT_AUTO_SEED_PATH))
+        ),
     )
 
 
