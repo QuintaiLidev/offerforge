@@ -194,6 +194,11 @@ http://127.0.0.1:8000/docs
 
 Bulk card import is available through `POST /api/v1/cards/bulk` with a JSON array body.
 
+## Seed cards
+
+Week one interview seed cards are available at `data_seed/cards_seed_week1_interview_v3.json`.
+The file contains 95 cards for interview replay, resume projects, debugging, UI automation, Python coding, SQL, Linux, and HR practice. It is designed for import through `POST /api/v1/cards/bulk` and does not contain sensitive information.
+
 ## 移动端兼容预留原则
 
 后续正式业务前端使用原生 HTML、CSS、JavaScript。页面采用 mobile-first 或响应式设计，支持常见手机浏览器，按钮和输入区域适合触屏操作，不依赖 hover 才能完成关键操作，不固定桌面端宽度。
