@@ -30,17 +30,25 @@ def calculate_next_review_at(
     consecutive_correct_count: int = 0,
 ) -> datetime:
     base_time = practiced_at or utc_now()
+    next_consecutive_count = consecutive_correct_count + 1
+
     if rating is PracticeRating.DONT_KNOW:
         return base_time + timedelta(days=1)
     if rating is PracticeRating.WITH_HINT:
-        return base_time + timedelta(days=2)
+        return base_time + timedelta(days=1)
     if rating is PracticeRating.CORRECT_SLOW:
-        return base_time + timedelta(days=4)
+        return base_time + timedelta(days=2)
     if rating is PracticeRating.CORRECT_EXPLAIN:
-        return base_time + timedelta(days=7)
-    if rating is PracticeRating.TRANSFER and consecutive_correct_count >= 1:
-        return base_time + timedelta(days=30)
-    return base_time + timedelta(days=14)
+        return base_time + timedelta(days=4)
+    if rating is PracticeRating.TRANSFER:
+        if next_consecutive_count == 1:
+            return base_time + timedelta(days=7)
+        if next_consecutive_count == 2:
+            return base_time + timedelta(days=14)
+        if next_consecutive_count == 3:
+            return base_time + timedelta(days=30)
+        return base_time + timedelta(days=60)
+    return base_time + timedelta(days=1)
 
 
 def calculate_mastery_level(
@@ -50,9 +58,11 @@ def calculate_mastery_level(
     if rating in {PracticeRating.DONT_KNOW, PracticeRating.WITH_HINT}:
         return MasteryLevel.LEARNING
     if rating is PracticeRating.CORRECT_SLOW:
-        return MasteryLevel.FAMILIAR
+        if consecutive_correct_count_after >= 2:
+            return MasteryLevel.FAMILIAR
+        return MasteryLevel.LEARNING
     if rating is PracticeRating.CORRECT_EXPLAIN:
-        return MasteryLevel.PROFICIENT
-    if consecutive_correct_count_after >= 2:
+        return MasteryLevel.FAMILIAR
+    if consecutive_correct_count_after >= 3:
         return MasteryLevel.MASTERED
-    return MasteryLevel.PROFICIENT
+    return MasteryLevel.FAMILIAR

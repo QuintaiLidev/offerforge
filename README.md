@@ -200,7 +200,11 @@ Bulk card import is available through `POST /api/v1/cards/bulk` with a JSON arra
 
 ## Balanced review queue
 
-`GET /api/v1/reviews/today` balances returned cards across categories where possible. It uses a deterministic daily shuffle inside each category, so refreshing on the same day keeps the queue stable while the next day can reshuffle. Due cards still take priority, new cards only fill remaining slots, and the five-rating spaced review intervals are unchanged.
+`GET /api/v1/reviews/today` balances returned cards across categories where possible. It uses a deterministic daily shuffle inside each category, so refreshing on the same day keeps the queue stable while the next day can reshuffle. Due cards still take priority, new cards only fill remaining slots, and scheduling intervals remain owned by the five-rating rules.
+
+## Scheduling rules
+
+OfferForge uses the five rating buttons to schedule the next review. `dont_know` and `with_hint` return in 1 day, `correct_slow` returns in about 2 days, `correct_explain` returns in about 4 days, and `transfer` stretches across 7 / 14 / 30 / 60 days as the consecutive correct count grows. Repeated transfer can promote a card to mastered, while a failed or hinted answer drops it back to learning. Balanced Review Queue only sorts today's eligible cards and does not change these scheduling rules.
 
 ## Seed cards
 

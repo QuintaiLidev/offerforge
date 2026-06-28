@@ -107,7 +107,7 @@ def service_attempt_response() -> SimpleNamespace:
         elapsed_seconds=12,
         error_summary=None,
         feedback="Mocked feedback",
-        scheduled_next_review_at=FIXED_NOW + timedelta(days=4),
+        scheduled_next_review_at=FIXED_NOW + timedelta(days=2),
         created_at=FIXED_NOW,
     )
 
@@ -125,9 +125,9 @@ def service_card_response() -> SimpleNamespace:
         scoring_rules={},
         tags=[],
         source_reference=None,
-        mastery_level=MasteryLevel.FAMILIAR,
+        mastery_level=MasteryLevel.LEARNING,
         last_practiced_at=FIXED_NOW,
-        next_review_at=FIXED_NOW + timedelta(days=4),
+        next_review_at=FIXED_NOW + timedelta(days=2),
         consecutive_correct_count=1,
         total_error_count=0,
         is_active=True,
@@ -157,11 +157,11 @@ async def test_post_practice_attempt_returns_attempt_and_card(
     assert data["attempt"]["rating"] == "correct_slow"
     assert data["attempt"]["is_correct"] is True
     assert data["attempt"]["feedback"] == "Well explained."
-    assert data["attempt"]["scheduled_next_review_at"] == iso_at(timedelta(days=4))
+    assert data["attempt"]["scheduled_next_review_at"] == iso_at(timedelta(days=2))
     assert data["card"]["id"] == card.id
-    assert data["card"]["mastery_level"] == "familiar"
+    assert data["card"]["mastery_level"] == "learning"
     assert data["card"]["last_practiced_at"] == iso_at()
-    assert data["card"]["next_review_at"] == iso_at(timedelta(days=4))
+    assert data["card"]["next_review_at"] == iso_at(timedelta(days=2))
 
 
 @pytest.mark.parametrize(
@@ -176,18 +176,18 @@ async def test_post_practice_attempt_returns_attempt_and_card(
     ),
     [
         ("dont_know", False, False, "learning", timedelta(days=1), 0, 1),
-        ("with_hint", False, True, "learning", timedelta(days=2), 0, 1),
-        ("correct_slow", True, False, "familiar", timedelta(days=4), 1, 0),
+        ("with_hint", False, True, "learning", timedelta(days=1), 0, 1),
+        ("correct_slow", True, False, "learning", timedelta(days=2), 1, 0),
         (
             "correct_explain",
             True,
             False,
-            "proficient",
-            timedelta(days=7),
+            "familiar",
+            timedelta(days=4),
             1,
             0,
         ),
-        ("transfer", True, False, "proficient", timedelta(days=14), 1, 0),
+        ("transfer", True, False, "familiar", timedelta(days=7), 1, 0),
     ],
 )
 async def test_post_practice_attempt_applies_rating_rules(
@@ -222,12 +222,12 @@ async def test_post_practice_attempt_applies_rating_rules(
     assert data["card"]["total_error_count"] == expected_errors
 
 
-async def test_second_transfer_schedules_thirty_day_review(
+async def test_transfer_schedules_progressive_review_intervals(
     client: httpx.AsyncClient,
     db_session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    card = create_card(db_session, title="Second transfer card")
+    card = create_card(db_session, title="Transfer progression card")
     monkeypatch.setattr("app.services.practice_attempt.utc_now", lambda: FIXED_NOW)
 
     first = await client.post(
@@ -238,13 +238,60 @@ async def test_second_transfer_schedules_thirty_day_review(
         "/api/v1/practice-attempts",
         json=attempt_payload(card_id=card.id, rating="transfer"),
     )
+    third = await client.post(
+        "/api/v1/practice-attempts",
+        json=attempt_payload(card_id=card.id, rating="transfer"),
+    )
+    fourth = await client.post(
+        "/api/v1/practice-attempts",
+        json=attempt_payload(card_id=card.id, rating="transfer"),
+    )
 
     assert first.status_code == 201
     assert second.status_code == 201
+    assert third.status_code == 201
+    assert fourth.status_code == 201
+    first_data = first.json()
     second_data = second.json()
+    third_data = third.json()
+    fourth_data = fourth.json()
+    assert first_data["card"]["next_review_at"] == iso_at(timedelta(days=7))
     assert second_data["card"]["consecutive_correct_count"] == 2
-    assert second_data["card"]["mastery_level"] == "mastered"
-    assert second_data["card"]["next_review_at"] == iso_at(timedelta(days=30))
+    assert second_data["card"]["mastery_level"] == "familiar"
+    assert second_data["card"]["next_review_at"] == iso_at(timedelta(days=14))
+    assert third_data["card"]["consecutive_correct_count"] == 3
+    assert third_data["card"]["mastery_level"] == "mastered"
+    assert third_data["card"]["next_review_at"] == iso_at(timedelta(days=30))
+    assert fourth_data["card"]["consecutive_correct_count"] == 4
+    assert fourth_data["card"]["mastery_level"] == "mastered"
+    assert fourth_data["card"]["next_review_at"] == iso_at(timedelta(days=60))
+
+
+async def test_mastered_card_dont_know_downgrades_to_learning(
+    client: httpx.AsyncClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    card = create_card(db_session, title="Mastered downgrade card")
+    card.consecutive_correct_count = 4
+    card.total_error_count = 2
+    card.mastery_level = MasteryLevel.MASTERED
+    db_session.commit()
+    db_session.refresh(card)
+    monkeypatch.setattr("app.services.practice_attempt.utc_now", lambda: FIXED_NOW)
+
+    response = await client.post(
+        "/api/v1/practice-attempts",
+        json=attempt_payload(card_id=card.id, rating="dont_know"),
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["attempt"]["scheduled_next_review_at"] == iso_at(timedelta(days=1))
+    assert data["attempt"]["scheduled_next_review_at"] == data["card"]["next_review_at"]
+    assert data["card"]["mastery_level"] == "learning"
+    assert data["card"]["consecutive_correct_count"] == 0
+    assert data["card"]["total_error_count"] == 3
 
 
 async def test_post_practice_attempt_missing_card_returns_404(
@@ -342,10 +389,11 @@ async def test_post_practice_attempt_persists_attempt_and_updates_card(
     assert attempt.used_hint is True
     assert attempt.user_answer == "Persisted answer"
     assert attempt.elapsed_seconds == 21
-    assert attempt.scheduled_next_review_at == FIXED_NOW + timedelta(days=2)
+    assert attempt.scheduled_next_review_at == FIXED_NOW + timedelta(days=1)
     assert updated_card is not None
     assert updated_card.last_practiced_at == FIXED_NOW
-    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=2)
+    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=1)
+    assert updated_card.next_review_at == attempt.scheduled_next_review_at
     assert updated_card.mastery_level is MasteryLevel.LEARNING
     assert updated_card.total_error_count == 1
 

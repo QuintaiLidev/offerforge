@@ -123,8 +123,9 @@ def test_complete_practice_with_hint_forces_used_hint_and_error_count(
 
     assert attempt.is_correct is False
     assert attempt.used_hint is True
+    assert attempt.scheduled_next_review_at == FIXED_NOW + timedelta(days=1)
     assert updated_card.total_error_count == 1
-    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=2)
+    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=1)
     assert updated_card.mastery_level is MasteryLevel.LEARNING
 
 
@@ -143,13 +144,33 @@ def test_complete_practice_correct_slow_updates_success_stats(
     )
 
     assert attempt.is_correct is True
+    assert attempt.scheduled_next_review_at == FIXED_NOW + timedelta(days=2)
     assert updated_card.consecutive_correct_count == 1
     assert updated_card.total_error_count == 2
+    assert updated_card.mastery_level is MasteryLevel.LEARNING
+    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=2)
+
+
+def test_complete_practice_correct_slow_second_success_sets_familiar(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, card_repository, _ = make_service(db_session)
+    card = create_card(card_repository)
+    card.consecutive_correct_count = 1
+    card_repository.save(card)
+    monkeypatch.setattr("app.services.practice_attempt.utc_now", lambda: FIXED_NOW)
+
+    _, updated_card = service.complete_practice(
+        make_attempt_create(card_id=card.id, rating=PracticeRating.CORRECT_SLOW)
+    )
+
+    assert updated_card.consecutive_correct_count == 2
     assert updated_card.mastery_level is MasteryLevel.FAMILIAR
-    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=4)
+    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=2)
 
 
-def test_complete_practice_correct_explain_sets_proficient(
+def test_complete_practice_correct_explain_sets_familiar(
     db_session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -161,11 +182,12 @@ def test_complete_practice_correct_explain_sets_proficient(
         make_attempt_create(card_id=card.id, rating=PracticeRating.CORRECT_EXPLAIN)
     )
 
-    assert updated_card.mastery_level is MasteryLevel.PROFICIENT
-    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=7)
+    assert updated_card.consecutive_correct_count == 1
+    assert updated_card.mastery_level is MasteryLevel.FAMILIAR
+    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=4)
 
 
-def test_complete_practice_transfer_first_time_sets_fourteen_days(
+def test_complete_practice_transfer_first_time_sets_seven_days(
     db_session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -178,11 +200,11 @@ def test_complete_practice_transfer_first_time_sets_fourteen_days(
     )
 
     assert updated_card.consecutive_correct_count == 1
-    assert updated_card.mastery_level is MasteryLevel.PROFICIENT
-    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=14)
+    assert updated_card.mastery_level is MasteryLevel.FAMILIAR
+    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=7)
 
 
-def test_complete_practice_transfer_second_time_sets_mastered_and_thirty_days(
+def test_complete_practice_transfer_second_time_sets_fourteen_days(
     db_session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -197,8 +219,70 @@ def test_complete_practice_transfer_second_time_sets_mastered_and_thirty_days(
     )
 
     assert updated_card.consecutive_correct_count == 2
+    assert updated_card.mastery_level is MasteryLevel.FAMILIAR
+    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=14)
+
+
+def test_complete_practice_transfer_third_time_sets_mastered_and_thirty_days(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, card_repository, _ = make_service(db_session)
+    card = create_card(card_repository)
+    card.consecutive_correct_count = 2
+    card_repository.save(card)
+    monkeypatch.setattr("app.services.practice_attempt.utc_now", lambda: FIXED_NOW)
+
+    _, updated_card = service.complete_practice(
+        make_attempt_create(card_id=card.id, rating=PracticeRating.TRANSFER)
+    )
+
+    assert updated_card.consecutive_correct_count == 3
     assert updated_card.mastery_level is MasteryLevel.MASTERED
     assert updated_card.next_review_at == FIXED_NOW + timedelta(days=30)
+
+
+def test_complete_practice_transfer_fourth_time_sets_sixty_days(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, card_repository, _ = make_service(db_session)
+    card = create_card(card_repository)
+    card.consecutive_correct_count = 3
+    card.mastery_level = MasteryLevel.MASTERED
+    card_repository.save(card)
+    monkeypatch.setattr("app.services.practice_attempt.utc_now", lambda: FIXED_NOW)
+
+    _, updated_card = service.complete_practice(
+        make_attempt_create(card_id=card.id, rating=PracticeRating.TRANSFER)
+    )
+
+    assert updated_card.consecutive_correct_count == 4
+    assert updated_card.mastery_level is MasteryLevel.MASTERED
+    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=60)
+
+
+def test_complete_practice_mastered_card_dont_know_downgrades_to_learning(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, card_repository, _ = make_service(db_session)
+    card = create_card(card_repository)
+    card.consecutive_correct_count = 4
+    card.total_error_count = 2
+    card.mastery_level = MasteryLevel.MASTERED
+    card_repository.save(card)
+    monkeypatch.setattr("app.services.practice_attempt.utc_now", lambda: FIXED_NOW)
+
+    attempt, updated_card = service.complete_practice(
+        make_attempt_create(card_id=card.id, rating=PracticeRating.DONT_KNOW)
+    )
+
+    assert attempt.scheduled_next_review_at == FIXED_NOW + timedelta(days=1)
+    assert updated_card.next_review_at == attempt.scheduled_next_review_at
+    assert updated_card.mastery_level is MasteryLevel.LEARNING
+    assert updated_card.consecutive_correct_count == 0
+    assert updated_card.total_error_count == 3
 
 
 def test_complete_practice_preserves_user_is_correct_but_stats_follow_rating(
@@ -220,6 +304,7 @@ def test_complete_practice_preserves_user_is_correct_but_stats_follow_rating(
     assert attempt.is_correct is False
     assert updated_card.consecutive_correct_count == 1
     assert updated_card.total_error_count == 0
+    assert updated_card.next_review_at == FIXED_NOW + timedelta(days=7)
 
 
 def test_complete_practice_returns_attempt_and_updated_card(

@@ -16,11 +16,13 @@ from app.services.review_rules import (
     ("rating", "consecutive_before", "expected_delta"),
     [
         (PracticeRating.DONT_KNOW, 0, timedelta(days=1)),
-        (PracticeRating.WITH_HINT, 0, timedelta(days=2)),
-        (PracticeRating.CORRECT_SLOW, 0, timedelta(days=4)),
-        (PracticeRating.CORRECT_EXPLAIN, 0, timedelta(days=7)),
-        (PracticeRating.TRANSFER, 0, timedelta(days=14)),
-        (PracticeRating.TRANSFER, 1, timedelta(days=30)),
+        (PracticeRating.WITH_HINT, 0, timedelta(days=1)),
+        (PracticeRating.CORRECT_SLOW, 0, timedelta(days=2)),
+        (PracticeRating.CORRECT_EXPLAIN, 0, timedelta(days=4)),
+        (PracticeRating.TRANSFER, 0, timedelta(days=7)),
+        (PracticeRating.TRANSFER, 1, timedelta(days=14)),
+        (PracticeRating.TRANSFER, 2, timedelta(days=30)),
+        (PracticeRating.TRANSFER, 3, timedelta(days=60)),
     ],
 )
 def test_calculate_next_review_at_uses_five_rating_rules(
@@ -51,10 +53,12 @@ def test_calculate_next_review_at_defaults_to_utc_naive_now() -> None:
     [
         (PracticeRating.DONT_KNOW, 0, MasteryLevel.LEARNING),
         (PracticeRating.WITH_HINT, 0, MasteryLevel.LEARNING),
-        (PracticeRating.CORRECT_SLOW, 1, MasteryLevel.FAMILIAR),
-        (PracticeRating.CORRECT_EXPLAIN, 1, MasteryLevel.PROFICIENT),
-        (PracticeRating.TRANSFER, 1, MasteryLevel.PROFICIENT),
-        (PracticeRating.TRANSFER, 2, MasteryLevel.MASTERED),
+        (PracticeRating.CORRECT_SLOW, 1, MasteryLevel.LEARNING),
+        (PracticeRating.CORRECT_SLOW, 2, MasteryLevel.FAMILIAR),
+        (PracticeRating.CORRECT_EXPLAIN, 1, MasteryLevel.FAMILIAR),
+        (PracticeRating.TRANSFER, 1, MasteryLevel.FAMILIAR),
+        (PracticeRating.TRANSFER, 2, MasteryLevel.FAMILIAR),
+        (PracticeRating.TRANSFER, 3, MasteryLevel.MASTERED),
     ],
 )
 def test_calculate_mastery_level(
