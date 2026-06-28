@@ -51,6 +51,21 @@ def create_existing_card(db_session: Session) -> KnowledgeCard:
     )
 
 
+def wait_for_thread(thread: object, timeout: float = 10.0) -> None:
+    assert thread is not None
+    thread.join(timeout=timeout)
+    assert not thread.is_alive()
+
+
+async def request_health(application: object) -> httpx.Response:
+    transport = httpx.ASGITransport(app=application)
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://testserver",
+    ) as async_client:
+        return await async_client.get("/api/v1/health")
+
+
 def test_auto_seed_imports_week_one_cards_when_database_is_empty(
     db_session: Session,
 ) -> None:
@@ -134,6 +149,49 @@ def test_auto_seed_invalid_schema_returns_zero(
     assert KnowledgeCardRepository(db_session).count() == 0
 
 
+def test_auto_seed_internal_exception_returns_zero(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def raise_count(self: KnowledgeCardRepository) -> int:
+        raise RuntimeError("database count failed")
+
+    monkeypatch.setattr(KnowledgeCardRepository, "count", raise_count)
+
+    created_count = seed_knowledge_cards_if_empty(db_session, DEFAULT_AUTO_SEED_PATH)
+
+    assert created_count == 0
+
+
+def test_run_auto_seed_closes_session_when_seed_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class DummySession:
+        closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    dummy_session = DummySession()
+
+    def raise_seed(db: DummySession, seed_path: Path) -> int:
+        raise RuntimeError("seed failed")
+
+    monkeypatch.setattr("app.main.SessionLocal", lambda: dummy_session)
+    monkeypatch.setattr("app.main.seed_knowledge_cards_if_empty", raise_seed)
+    settings = load_settings(
+        {
+            "OFFERFORGE_TESTING": "true",
+            "OFFERFORGE_AUTO_SEED_ON_STARTUP": "true",
+        }
+    )
+
+    created_count = run_auto_seed(settings)
+
+    assert created_count == 0
+    assert dummy_session.closed is True
+
+
 async def test_auto_seeded_cards_are_available_for_today_reviews(
     client: httpx.AsyncClient,
     db_session: Session,
@@ -160,4 +218,65 @@ async def test_lifespan_runs_auto_seed_when_enabled(
 
     application = create_app()
     async with application.router.lifespan_context(application):
+        wait_for_thread(application.state.auto_seed_thread)
+        db_session.rollback()
         assert KnowledgeCardRepository(db_session).count() == 95
+
+
+async def test_lifespan_health_works_when_auto_seed_raises(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    def raise_seed(settings: object) -> int:
+        raise RuntimeError("background seed failed")
+
+    monkeypatch.setenv("OFFERFORGE_AUTO_SEED_ON_STARTUP", "true")
+    monkeypatch.setattr("app.main.run_auto_seed", raise_seed)
+    get_settings.cache_clear()
+
+    application = create_app()
+    async with application.router.lifespan_context(application):
+        response = await request_health(application)
+        wait_for_thread(application.state.auto_seed_thread)
+
+    assert response.status_code == 200
+
+
+async def test_lifespan_health_works_when_auto_seed_file_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OFFERFORGE_AUTO_SEED_ON_STARTUP", "true")
+    monkeypatch.setenv("OFFERFORGE_AUTO_SEED_PATH", str(tmp_path / "missing.json"))
+    get_settings.cache_clear()
+
+    application = create_app()
+    async with application.router.lifespan_context(application):
+        response = await request_health(application)
+        wait_for_thread(application.state.auto_seed_thread)
+
+    assert response.status_code == 200
+    db_session.rollback()
+    assert KnowledgeCardRepository(db_session).count() == 0
+
+
+async def test_lifespan_health_works_when_auto_seed_json_is_invalid(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    invalid_json_path = tmp_path / "invalid.json"
+    invalid_json_path.write_text("{not-valid-json", encoding="utf-8")
+    monkeypatch.setenv("OFFERFORGE_AUTO_SEED_ON_STARTUP", "true")
+    monkeypatch.setenv("OFFERFORGE_AUTO_SEED_PATH", str(invalid_json_path))
+    get_settings.cache_clear()
+
+    application = create_app()
+    async with application.router.lifespan_context(application):
+        response = await request_health(application)
+        wait_for_thread(application.state.auto_seed_thread)
+
+    assert response.status_code == 200
+    db_session.rollback()
+    assert KnowledgeCardRepository(db_session).count() == 0

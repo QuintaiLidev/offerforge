@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 import logging
+from threading import Thread
 
 from fastapi import Depends, FastAPI
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -22,7 +23,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     init_db()
-    run_auto_seed(get_settings())
+    try:
+        application.state.auto_seed_thread = start_auto_seed_background(get_settings())
+    except Exception:
+        logger.exception("Auto seed failed during startup; continue without seed.")
     yield
 
 
@@ -50,8 +54,36 @@ def run_auto_seed(settings: Settings) -> int:
         logger.info("Auto seed disabled.")
         return 0
 
-    with SessionLocal() as db:
+    db = SessionLocal()
+    try:
         return seed_knowledge_cards_if_empty(db, settings.auto_seed_path)
+    except Exception:
+        logger.exception("Auto seed failed during startup; continue without seed.")
+        return 0
+    finally:
+        db.close()
+
+
+def start_auto_seed_background(settings: Settings) -> Thread | None:
+    if not settings.auto_seed_on_startup:
+        logger.info("Auto seed disabled.")
+        return None
+
+    thread = Thread(
+        target=_run_auto_seed_background,
+        args=(settings,),
+        name="offerforge-auto-seed",
+        daemon=True,
+    )
+    thread.start()
+    return thread
+
+
+def _run_auto_seed_background(settings: Settings) -> None:
+    try:
+        run_auto_seed(settings)
+    except Exception:
+        logger.exception("Auto seed failed during startup; continue without seed.")
 
 
 def register_root_redirect(application: FastAPI) -> None:

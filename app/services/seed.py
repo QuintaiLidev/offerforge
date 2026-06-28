@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.repositories import KnowledgeCardRepository
@@ -17,6 +16,14 @@ logger = logging.getLogger(__name__)
 
 
 def seed_knowledge_cards_if_empty(db: Session, seed_path: Path) -> int:
+    try:
+        return _seed_knowledge_cards_if_empty(db, seed_path)
+    except Exception:
+        logger.exception("Auto seed failed; continue without seed.")
+        return 0
+
+
+def _seed_knowledge_cards_if_empty(db: Session, seed_path: Path) -> int:
     repository = KnowledgeCardRepository(db)
     existing_count = repository.count()
     if existing_count > 0:
@@ -31,7 +38,7 @@ def seed_knowledge_cards_if_empty(db: Session, seed_path: Path) -> int:
     service = KnowledgeCardService(repository)
     try:
         created = service.create_cards(items)
-    except SQLAlchemyError:
+    except Exception:
         logger.exception("Auto seed failed while inserting knowledge cards.")
         return 0
 

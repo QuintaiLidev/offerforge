@@ -205,7 +205,7 @@ The file contains 95 cards for interview replay, resume projects, debugging, UI 
 
 ## Auto seed restore
 
-On startup, OfferForge can auto-import `data_seed/cards_seed_week1_interview_v3.json` when the knowledge card table is empty. This helps restore the 95-card seed set after a Render free-environment redeploy or restart clears SQLite data. Existing cards are never duplicated, and this only restores knowledge cards, not practice attempts or today-done records. Set `OFFERFORGE_AUTO_SEED_ON_STARTUP=false` to disable it, or override the file with `OFFERFORGE_AUTO_SEED_PATH`.
+On startup, OfferForge can auto-import `data_seed/cards_seed_week1_interview_v3.json` when the knowledge card table is empty. This helps restore the 95-card seed set after a Render free-environment redeploy or restart clears SQLite data. Existing cards are never duplicated, and this only restores knowledge cards, not practice attempts or today-done records. Auto seed is best-effort: missing files, validation failures, or import errors are logged and should not block health checks. Set `OFFERFORGE_AUTO_SEED_ON_STARTUP=false` to disable it, or override the file with `OFFERFORGE_AUTO_SEED_PATH`.
 
 ## 移动端兼容预留原则
 
