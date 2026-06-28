@@ -15,7 +15,12 @@ from app.schemas.practice_attempt import (
     PracticeAttemptCreate,
     PracticeAttemptRead,
 )
-from app.schemas.review import ReviewMode, ReviewTodayResponse
+from app.schemas.review import (
+    DoneTodayReviewItem,
+    DoneTodayReviewResponse,
+    ReviewMode,
+    ReviewTodayResponse,
+)
 
 __all__ = [
     "KnowledgeCardBase",
@@ -29,6 +34,8 @@ __all__ = [
     "PracticeAttemptCompleteResponse",
     "PracticeAttemptCreate",
     "PracticeAttemptRead",
+    "DoneTodayReviewItem",
+    "DoneTodayReviewResponse",
     "ReviewMode",
     "ReviewTodayResponse",
 ]

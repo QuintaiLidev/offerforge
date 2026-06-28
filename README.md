@@ -194,6 +194,10 @@ http://127.0.0.1:8000/docs
 
 Bulk card import is available through `POST /api/v1/cards/bulk` with a JSON array body.
 
+## Today done review
+
+`GET /api/v1/reviews/done-today` returns cards practiced during the current UTC day. The `/app` page shows today's practiced cards after submission so the question and reference answer can be reviewed again. This is a same-day review aid and does not change scheduling rules.
+
 ## Seed cards
 
 Week one interview seed cards are available at `data_seed/cards_seed_week1_interview_v3.json`.

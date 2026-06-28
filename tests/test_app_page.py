@@ -46,7 +46,9 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "text/html" in response.headers["content-type"]
     assert "OfferForge" in response.text
     assert "今日复习" in response.text
+    assert "今天已练习" in response.text
     assert "/api/v1/reviews/today" in response.text
+    assert "/api/v1/reviews/done-today" in response.text
     assert "/api/v1/practice-attempts" in response.text
     assert "answer_text" in response.text
 

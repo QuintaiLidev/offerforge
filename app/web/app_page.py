@@ -240,6 +240,95 @@ APP_HTML = """<!doctype html>
       text-align: center;
     }
 
+    .done-section {
+      margin-top: 18px;
+      padding: 16px;
+    }
+
+    .done-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .done-header h2 {
+      font-size: 1.08rem;
+      line-height: 1.2;
+    }
+
+    .done-loading {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .done-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .done-item {
+      padding: 13px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fbfcfd;
+    }
+
+    .done-title {
+      margin-bottom: 8px;
+      font-size: 1rem;
+      line-height: 1.35;
+    }
+
+    .done-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .done-toggle {
+      width: 100%;
+      min-height: 42px;
+      border: 0;
+      border-radius: 8px;
+      background: #e7eee9;
+      color: var(--accent-strong);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .done-detail {
+      display: none;
+      margin-top: 10px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #f3f7f5;
+    }
+
+    .done-detail.visible {
+      display: block;
+    }
+
+    .done-block + .done-block {
+      margin-top: 10px;
+    }
+
+    .done-block strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .done-block p {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
     .hidden {
       display: none;
     }
@@ -302,6 +391,15 @@ APP_HTML = """<!doctype html>
         </div>
       </div>
     </section>
+
+    <section id="doneTodayPanel" class="panel done-section" aria-live="polite">
+      <div class="done-header">
+        <h2>今天已练习</h2>
+        <span id="doneLoadingText" class="done-loading">加载中...</span>
+      </div>
+      <div id="doneEmptyState" class="empty hidden">今天还没有已练习卡片</div>
+      <div id="doneList" class="done-list"></div>
+    </section>
   </main>
 
   <script>
@@ -327,6 +425,9 @@ APP_HTML = """<!doctype html>
       answerText: document.querySelector("#answerText"),
       answerInput: document.querySelector("#answerInput"),
       ratingButtons: Array.from(document.querySelectorAll("[data-rating]")),
+      doneLoadingText: document.querySelector("#doneLoadingText"),
+      doneEmptyState: document.querySelector("#doneEmptyState"),
+      doneList: document.querySelector("#doneList"),
     };
 
     function setText(element, value) {
@@ -335,6 +436,13 @@ APP_HTML = """<!doctype html>
 
     function formatValue(value) {
       return String(value || "").replace(/_/g, " ");
+    }
+
+    function formatDateTime(value) {
+      if (!value) {
+        return "";
+      }
+      return String(value).replace("T", " ").slice(0, 19);
     }
 
     function showError(message) {
@@ -425,6 +533,87 @@ APP_HTML = """<!doctype html>
       }
     }
 
+    async function loadDoneToday() {
+      elements.doneLoadingText.textContent = "加载中...";
+      elements.doneEmptyState.classList.add("hidden");
+      elements.doneList.replaceChildren();
+
+      try {
+        const doneToday = await fetchJson("/api/v1/reviews/done-today?limit=20");
+        if (!doneToday.items.length) {
+          elements.doneEmptyState.classList.remove("hidden");
+          return;
+        }
+
+        doneToday.items.forEach((item) => {
+          elements.doneList.appendChild(renderDoneItem(item));
+        });
+      } catch (error) {
+        showError(`已练习加载失败：${error.message}`);
+      } finally {
+        elements.doneLoadingText.textContent = "";
+      }
+    }
+
+    function createDoneBlock(label, text) {
+      const block = document.createElement("div");
+      block.className = "done-block";
+
+      const title = document.createElement("strong");
+      title.textContent = label;
+
+      const content = document.createElement("p");
+      content.textContent = text || "";
+
+      block.append(title, content);
+      return block;
+    }
+
+    function renderDoneItem(item) {
+      const card = item.card;
+      const attempt = item.latest_attempt;
+      const wrapper = document.createElement("article");
+      wrapper.className = "done-item";
+
+      const title = document.createElement("h3");
+      title.className = "done-title";
+      title.textContent = card.title;
+
+      const meta = document.createElement("div");
+      meta.className = "done-meta";
+      [card.category, card.difficulty, attempt.rating, formatDateTime(attempt.created_at)]
+        .filter(Boolean)
+        .forEach((value) => {
+          const chip = document.createElement("span");
+          chip.className = "chip";
+          chip.textContent = formatValue(value);
+          meta.appendChild(chip);
+        });
+
+      const toggle = document.createElement("button");
+      toggle.className = "done-toggle";
+      toggle.type = "button";
+      toggle.textContent = "查看答案";
+
+      const detail = document.createElement("div");
+      detail.className = "done-detail";
+      detail.append(
+        createDoneBlock("题目", card.question),
+        createDoneBlock("参考答案", card.reference_answer)
+      );
+      if (attempt.user_answer) {
+        detail.appendChild(createDoneBlock("我的上次回答", attempt.user_answer));
+      }
+
+      toggle.addEventListener("click", () => {
+        const visible = detail.classList.toggle("visible");
+        toggle.textContent = visible ? "收起答案" : "查看答案";
+      });
+
+      wrapper.append(title, meta, toggle, detail);
+      return wrapper;
+    }
+
     function renderCard(card) {
       state.currentCard = card;
       state.cardStartedAt = Date.now();
@@ -475,7 +664,7 @@ APP_HTML = """<!doctype html>
             elapsed_seconds: elapsedSeconds,
           }),
         });
-        await loadToday();
+        await Promise.all([loadToday(), loadDoneToday()]);
         showSuccess("提交成功");
       } catch (error) {
         showError(`提交失败：${error.message}`);
@@ -491,6 +680,7 @@ APP_HTML = """<!doctype html>
     });
 
     loadToday();
+    loadDoneToday();
   </script>
 </body>
 </html>

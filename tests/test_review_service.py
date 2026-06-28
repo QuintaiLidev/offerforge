@@ -49,7 +49,7 @@ def test_get_today_reviews_returns_due_cards_without_new_fallback(
         mastery_level=MasteryLevel.LEARNING,
     )
     repository.list_due_for_review.return_value = ([due_card], 1)
-    service = ReviewService(repository)
+    service = ReviewService(repository, Mock())
     monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
 
     response = service.get_today_reviews(limit=10)
@@ -70,7 +70,7 @@ def test_get_today_reviews_falls_back_to_new_cards_when_no_due(
     new_card = card_response(card_id=2, title="New card")
     repository.list_due_for_review.return_value = ([], 0)
     repository.list_new_for_review.return_value = ([new_card], 1)
-    service = ReviewService(repository)
+    service = ReviewService(repository, Mock())
     monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
 
     response = service.get_today_reviews(limit=5)
@@ -86,7 +86,7 @@ def test_get_today_reviews_falls_back_to_new_cards_when_no_due(
 
 @pytest.mark.parametrize("limit", [0, 51])
 def test_get_today_reviews_rejects_invalid_limit(limit: int) -> None:
-    service = ReviewService(Mock())
+    service = ReviewService(Mock(), Mock())
 
     with pytest.raises(ValueError, match="limit must be between 1 and 50"):
         service.get_today_reviews(limit=limit)

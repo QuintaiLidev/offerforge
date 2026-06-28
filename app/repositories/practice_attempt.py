@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.models import PracticeAttempt
+from app.models import KnowledgeCard, PracticeAttempt
 from app.schemas.practice_attempt import PracticeAttemptCreate
 
 
@@ -65,3 +67,52 @@ class PracticeAttemptRepository:
             .limit(1)
         )
         return self.session.scalar(statement)
+
+    def list_latest_attempts_by_card_for_period(
+        self,
+        *,
+        start_at: datetime,
+        end_at: datetime,
+        limit: int,
+    ) -> list[tuple[KnowledgeCard, PracticeAttempt]]:
+        if limit < 0:
+            raise ValueError("limit must be non-negative.")
+
+        ranked_attempts = (
+            select(
+                PracticeAttempt.id.label("attempt_id"),
+                func.row_number()
+                .over(
+                    partition_by=PracticeAttempt.knowledge_card_id,
+                    order_by=(
+                        PracticeAttempt.created_at.desc(),
+                        PracticeAttempt.id.desc(),
+                    ),
+                )
+                .label("attempt_rank"),
+            )
+            .where(
+                PracticeAttempt.created_at >= start_at,
+                PracticeAttempt.created_at < end_at,
+            )
+            .subquery()
+        )
+
+        statement = (
+            select(KnowledgeCard, PracticeAttempt)
+            .join(
+                PracticeAttempt,
+                PracticeAttempt.knowledge_card_id == KnowledgeCard.id,
+            )
+            .join(
+                ranked_attempts,
+                ranked_attempts.c.attempt_id == PracticeAttempt.id,
+            )
+            .where(ranked_attempts.c.attempt_rank == 1)
+            .order_by(PracticeAttempt.created_at.desc(), PracticeAttempt.id.desc())
+            .limit(limit)
+        )
+        return [
+            (card, attempt)
+            for card, attempt in self.session.execute(statement).all()
+        ]

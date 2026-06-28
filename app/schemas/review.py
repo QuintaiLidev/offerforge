@@ -6,7 +6,8 @@ from typing import Literal
 from pydantic import Field
 
 from app.schemas.common import SchemaModel
-from app.schemas.knowledge_card import KnowledgeCardListItem
+from app.schemas.knowledge_card import KnowledgeCardListItem, KnowledgeCardRead
+from app.schemas.practice_attempt import PracticeAttemptRead
 
 ReviewMode = Literal["due", "new"]
 
@@ -17,3 +18,12 @@ class ReviewTodayResponse(SchemaModel):
     total: int = Field(ge=0)
     limit: int = Field(ge=1, le=50)
     generated_at: datetime
+
+
+class DoneTodayReviewItem(SchemaModel):
+    card: KnowledgeCardRead
+    latest_attempt: PracticeAttemptRead
+
+
+class DoneTodayReviewResponse(SchemaModel):
+    items: list[DoneTodayReviewItem]

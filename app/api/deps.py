@@ -29,4 +29,5 @@ def get_review_service(
     db: Annotated[Session, Depends(get_db)],
 ) -> ReviewService:
     card_repository = KnowledgeCardRepository(db)
-    return ReviewService(card_repository)
+    attempt_repository = PracticeAttemptRepository(db)
+    return ReviewService(card_repository, attempt_repository)
