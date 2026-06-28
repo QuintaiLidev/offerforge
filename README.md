@@ -208,7 +208,7 @@ OfferForge uses the five rating buttons to schedule the next review. `dont_know`
 
 ## Review debug info
 
-The `/app` page shows each card's mastery state, consecutive correct count, error count, last practice time, and next review time. The today-done area also shows the latest rating and scheduling result. This only displays existing fields and does not change scheduling rules.
+The `/app` page shows each card's mastery state, consecutive correct count, error count, last practice time, and next review time. The today-done area shows the latest rating and scheduling result separately from the answer details. This only displays existing fields and does not change scheduling rules.
 
 ## Seed cards
 

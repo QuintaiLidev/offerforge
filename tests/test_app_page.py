@@ -47,6 +47,8 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "OfferForge" in response.text
     assert "今日复习" in response.text
     assert "今天已练习" in response.text
+    assert "查看答案" in response.text
+    assert "答案内容" in response.text
     assert "调度信息" in response.text
     assert "掌握状态" in response.text
     assert "连续正确" in response.text

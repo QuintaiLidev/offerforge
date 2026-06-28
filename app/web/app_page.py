@@ -348,6 +348,17 @@ APP_HTML = """<!doctype html>
       display: block;
     }
 
+    .done-schedule {
+      margin: 10px 0 12px;
+    }
+
+    .done-detail-title {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
     .done-block + .done-block {
       margin-top: 10px;
     }
@@ -729,8 +740,12 @@ APP_HTML = """<!doctype html>
       fillScheduleInfo(scheduleInfo, card, attempt);
       scheduleBlock.append(scheduleTitle, scheduleInfo);
 
+      const answerTitle = document.createElement("strong");
+      answerTitle.className = "done-detail-title";
+      answerTitle.textContent = "答案内容";
+
       detail.append(
-        scheduleBlock,
+        answerTitle,
         createDoneBlock("题目", card.question),
         createDoneBlock("参考答案", card.reference_answer)
       );
@@ -743,7 +758,8 @@ APP_HTML = """<!doctype html>
         toggle.textContent = visible ? "收起答案" : "查看答案";
       });
 
-      wrapper.append(title, meta, toggle, detail);
+      scheduleBlock.classList.add("done-schedule");
+      wrapper.append(title, meta, scheduleBlock, toggle, detail);
       return wrapper;
     }
 
