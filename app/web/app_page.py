@@ -151,6 +151,41 @@ APP_HTML = """<!doctype html>
       background: #f3f7f5;
     }
 
+    .schedule-info {
+      display: grid;
+      gap: 7px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #f7faf8;
+      color: var(--text);
+      font-size: 0.92rem;
+    }
+
+    .schedule-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid #e7ece9;
+      padding-bottom: 6px;
+    }
+
+    .schedule-row:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .schedule-row strong {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .schedule-row span {
+      min-width: 0;
+      text-align: right;
+      word-break: break-word;
+    }
+
     .answer.visible {
       display: block;
     }
@@ -360,6 +395,11 @@ APP_HTML = """<!doctype html>
       <h2 id="cardTitle" class="title"></h2>
 
       <div class="section">
+        <h2>调度信息</h2>
+        <div id="scheduleInfo" class="schedule-info"></div>
+      </div>
+
+      <div class="section">
         <h2>题目</h2>
         <p id="questionText" class="question"></p>
       </div>
@@ -419,6 +459,7 @@ APP_HTML = """<!doctype html>
       categoryText: document.querySelector("#categoryText"),
       difficultyText: document.querySelector("#difficultyText"),
       masteryText: document.querySelector("#masteryText"),
+      scheduleInfo: document.querySelector("#scheduleInfo"),
       cardTitle: document.querySelector("#cardTitle"),
       questionText: document.querySelector("#questionText"),
       showAnswerButton: document.querySelector("#showAnswerButton"),
@@ -440,9 +481,86 @@ APP_HTML = """<!doctype html>
 
     function formatDateTime(value) {
       if (!value) {
-        return "";
+        return "暂无";
       }
-      return String(value).replace("T", " ").slice(0, 19);
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return "暂无";
+      }
+      return date.toLocaleString();
+    }
+
+    function formatOptionalDateTime(value) {
+      const formatted = formatDateTime(value);
+      return formatted === "暂无" ? "" : formatted;
+    }
+
+    const masteryLabels = {
+      new: "新题",
+      learning: "学习中",
+      familiar: "熟悉中",
+      reviewing: "巩固中",
+      mastered: "已掌握",
+    };
+
+    const ratingLabels = {
+      dont_know: "完全不会",
+      with_hint: "看提示才会",
+      correct_slow: "答对但慢",
+      correct_explain: "能讲清楚",
+      transfer: "能迁移应用",
+    };
+
+    function formatMappedValue(value, labels) {
+      if (!value) {
+        return "暂无";
+      }
+      return labels[value] || formatValue(value);
+    }
+
+    function formatCount(value) {
+      if (value === 0) {
+        return "0";
+      }
+      if (value === null || value === undefined || value === "") {
+        return "暂无";
+      }
+      return String(value);
+    }
+
+    function createScheduleRow(label, value) {
+      const row = document.createElement("div");
+      row.className = "schedule-row";
+
+      const title = document.createElement("strong");
+      title.textContent = label;
+
+      const content = document.createElement("span");
+      content.textContent = value || "暂无";
+
+      row.append(title, content);
+      return row;
+    }
+
+    function fillScheduleInfo(container, card, latestAttempt = null) {
+      const rows = [];
+      if (latestAttempt) {
+        rows.push(
+          createScheduleRow(
+            "本次评价",
+            formatMappedValue(latestAttempt.rating, ratingLabels)
+          )
+        );
+      }
+
+      rows.push(
+        createScheduleRow("掌握状态", formatMappedValue(card.mastery_level, masteryLabels)),
+        createScheduleRow("连续正确", formatCount(card.consecutive_correct_count)),
+        createScheduleRow("错误次数", formatCount(card.total_error_count)),
+        createScheduleRow("上次练习", formatDateTime(card.last_practiced_at)),
+        createScheduleRow("下次复习", formatDateTime(card.next_review_at))
+      );
+      container.replaceChildren(...rows);
     }
 
     function showError(message) {
@@ -581,7 +699,12 @@ APP_HTML = """<!doctype html>
 
       const meta = document.createElement("div");
       meta.className = "done-meta";
-      [card.category, card.difficulty, attempt.rating, formatDateTime(attempt.created_at)]
+      [
+        card.category,
+        card.difficulty,
+        formatMappedValue(attempt.rating, ratingLabels),
+        formatOptionalDateTime(attempt.created_at),
+      ]
         .filter(Boolean)
         .forEach((value) => {
           const chip = document.createElement("span");
@@ -597,7 +720,17 @@ APP_HTML = """<!doctype html>
 
       const detail = document.createElement("div");
       detail.className = "done-detail";
+      const scheduleBlock = document.createElement("div");
+      scheduleBlock.className = "done-block";
+      const scheduleTitle = document.createElement("strong");
+      scheduleTitle.textContent = "调度信息";
+      const scheduleInfo = document.createElement("div");
+      scheduleInfo.className = "schedule-info";
+      fillScheduleInfo(scheduleInfo, card, attempt);
+      scheduleBlock.append(scheduleTitle, scheduleInfo);
+
       detail.append(
+        scheduleBlock,
         createDoneBlock("题目", card.question),
         createDoneBlock("参考答案", card.reference_answer)
       );
@@ -620,10 +753,11 @@ APP_HTML = """<!doctype html>
 
       setText(elements.categoryText, formatValue(card.category));
       setText(elements.difficultyText, formatValue(card.difficulty));
-      setText(elements.masteryText, formatValue(card.mastery_level));
+      setText(elements.masteryText, formatMappedValue(card.mastery_level, masteryLabels));
       setText(elements.cardTitle, card.title);
       setText(elements.questionText, card.question);
       setText(elements.answerText, card.reference_answer);
+      fillScheduleInfo(elements.scheduleInfo, card);
       elements.answerInput.value = "";
       elements.answerText.classList.remove("visible");
       elements.showAnswerButton.textContent = "显示答案";

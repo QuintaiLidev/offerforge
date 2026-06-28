@@ -206,6 +206,10 @@ Bulk card import is available through `POST /api/v1/cards/bulk` with a JSON arra
 
 OfferForge uses the five rating buttons to schedule the next review. `dont_know` and `with_hint` return in 1 day, `correct_slow` returns in about 2 days, `correct_explain` returns in about 4 days, and `transfer` stretches across 7 / 14 / 30 / 60 days as the consecutive correct count grows. Repeated transfer can promote a card to mastered, while a failed or hinted answer drops it back to learning. Balanced Review Queue only sorts today's eligible cards and does not change these scheduling rules.
 
+## Review debug info
+
+The `/app` page shows each card's mastery state, consecutive correct count, error count, last practice time, and next review time. The today-done area also shows the latest rating and scheduling result. This only displays existing fields and does not change scheduling rules.
+
 ## Seed cards
 
 Week one interview seed cards are available at `data_seed/cards_seed_week1_interview_v3.json`.

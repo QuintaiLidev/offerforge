@@ -47,10 +47,27 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "OfferForge" in response.text
     assert "今日复习" in response.text
     assert "今天已练习" in response.text
+    assert "调度信息" in response.text
+    assert "掌握状态" in response.text
+    assert "连续正确" in response.text
+    assert "错误次数" in response.text
+    assert "上次练习" in response.text
+    assert "下次复习" in response.text
+    assert "本次评价" in response.text
+    assert "mastery_level" in response.text
+    assert "next_review_at" in response.text
+    assert "consecutive_correct_count" in response.text
+    assert "total_error_count" in response.text
+    assert "last_practiced_at" in response.text
     assert "/api/v1/reviews/today" in response.text
     assert "/api/v1/reviews/done-today" in response.text
     assert "/api/v1/practice-attempts" in response.text
     assert "answer_text" in response.text
+    assert "dont_know" in response.text
+    assert "with_hint" in response.text
+    assert "correct_slow" in response.text
+    assert "correct_explain" in response.text
+    assert "transfer" in response.text
 
 
 async def test_root_redirects_to_app(
