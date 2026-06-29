@@ -45,6 +45,10 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "OfferForge" in response.text
+    assert "练习历史" in response.text
+    assert "historyList" in response.text
+    assert "展开历史" in response.text
+    assert "我的回答" in response.text
     assert "今日复习" in response.text
     assert "今天已练习" in response.text
     assert "查看答案" in response.text
@@ -63,7 +67,10 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "last_practiced_at" in response.text
     assert "/api/v1/reviews/today" in response.text
     assert "/api/v1/reviews/done-today" in response.text
+    assert "/api/v1/reviews/history?limit=50" in response.text
     assert "/api/v1/practice-attempts" in response.text
+    assert "loadHistory()" in response.text
+    assert "Promise.all([loadToday(), loadDoneToday(), loadHistory()])" in response.text
     assert "answer_text" in response.text
     assert "dont_know" in response.text
     assert "with_hint" in response.text

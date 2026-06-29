@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from app.models.enums import PracticeRating
 from app.schemas.common import SchemaModel
 from app.schemas.knowledge_card import KnowledgeCardListItem, KnowledgeCardRead
 from app.schemas.practice_attempt import PracticeAttemptRead
@@ -27,3 +28,16 @@ class DoneTodayReviewItem(SchemaModel):
 
 class DoneTodayReviewResponse(SchemaModel):
     items: list[DoneTodayReviewItem]
+
+
+class PracticeHistoryItem(SchemaModel):
+    attempt_id: int
+    created_at: datetime
+    rating: PracticeRating
+    user_answer: str | None
+    scheduled_next_review_at: datetime | None
+    card: KnowledgeCardRead
+
+
+class PracticeHistoryResponse(SchemaModel):
+    items: list[PracticeHistoryItem]

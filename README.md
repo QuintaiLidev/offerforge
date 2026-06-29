@@ -202,6 +202,8 @@ Bulk card import is available through `POST /api/v1/cards/bulk` with a JSON arra
 
 `GET /api/v1/reviews/done-today` returns cards practiced during the current UTC day. The `/app` page shows today's practiced cards after submission so the question and reference answer can be reviewed again. This is a same-day review aid and does not change scheduling rules.
 
+Practice history: `/app` can show recent practice attempts, including rating, user answer, card information, and next review time.
+
 ## Balanced review queue
 
 `GET /api/v1/reviews/today` balances returned cards across categories where possible. It uses a deterministic daily shuffle inside each category, so refreshing on the same day keeps the queue stable while the next day can reshuffle. Due cards still take priority, new cards only fill remaining slots, and scheduling intervals remain owned by the five-rating rules.

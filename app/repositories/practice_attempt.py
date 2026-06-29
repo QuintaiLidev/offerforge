@@ -79,6 +79,28 @@ class PracticeAttemptRepository:
         )
         return self.session.scalar(statement) or 0
 
+    def list_recent_with_cards(
+        self,
+        *,
+        limit: int = 50,
+    ) -> list[tuple[KnowledgeCard, PracticeAttempt]]:
+        if limit < 0:
+            raise ValueError("limit must be non-negative.")
+
+        statement = (
+            select(KnowledgeCard, PracticeAttempt)
+            .join(
+                PracticeAttempt,
+                PracticeAttempt.knowledge_card_id == KnowledgeCard.id,
+            )
+            .order_by(PracticeAttempt.created_at.desc(), PracticeAttempt.id.desc())
+            .limit(limit)
+        )
+        return [
+            (card, attempt)
+            for card, attempt in self.session.execute(statement).all()
+        ]
+
     def list_latest_attempts_by_card_for_period(
         self,
         *,

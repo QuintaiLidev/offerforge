@@ -5,7 +5,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import get_review_service
-from app.schemas.review import DoneTodayReviewResponse, ReviewTodayResponse
+from app.schemas.review import (
+    DoneTodayReviewResponse,
+    PracticeHistoryResponse,
+    ReviewTodayResponse,
+)
 from app.services import ReviewService
 
 router: APIRouter = APIRouter(prefix="/reviews", tags=["Reviews"])
@@ -43,3 +47,19 @@ def get_done_today_reviews(
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
 ) -> DoneTodayReviewResponse:
     return service.get_done_today_reviews(limit=limit)
+
+
+@router.get(
+    "/history",
+    response_model=PracticeHistoryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get recent practice history",
+    responses={
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Validation error"},
+    },
+)
+def get_practice_history(
+    service: ReviewServiceDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> PracticeHistoryResponse:
+    return service.get_practice_history(limit=limit)

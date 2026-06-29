@@ -18,6 +18,8 @@ from app.schemas.practice_attempt import (
 from app.schemas.review import (
     DoneTodayReviewItem,
     DoneTodayReviewResponse,
+    PracticeHistoryItem,
+    PracticeHistoryResponse,
     ReviewMode,
     ReviewTodayResponse,
 )
@@ -36,6 +38,8 @@ __all__ = [
     "PracticeAttemptRead",
     "DoneTodayReviewItem",
     "DoneTodayReviewResponse",
+    "PracticeHistoryItem",
+    "PracticeHistoryResponse",
     "ReviewMode",
     "ReviewTodayResponse",
 ]

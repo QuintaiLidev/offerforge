@@ -451,6 +451,15 @@ APP_HTML = """<!doctype html>
       <div id="doneEmptyState" class="empty hidden">今天还没有已练习卡片</div>
       <div id="doneList" class="done-list"></div>
     </section>
+
+    <section id="historyPanel" class="panel done-section" aria-live="polite">
+      <div class="done-header">
+        <h2>练习历史</h2>
+        <span id="historyLoadingText" class="done-loading">加载中...</span>
+      </div>
+      <div id="historyEmptyState" class="empty hidden">暂无练习历史</div>
+      <div id="historyList" class="done-list"></div>
+    </section>
   </main>
 
   <script>
@@ -480,6 +489,9 @@ APP_HTML = """<!doctype html>
       doneLoadingText: document.querySelector("#doneLoadingText"),
       doneEmptyState: document.querySelector("#doneEmptyState"),
       doneList: document.querySelector("#doneList"),
+      historyLoadingText: document.querySelector("#historyLoadingText"),
+      historyEmptyState: document.querySelector("#historyEmptyState"),
+      historyList: document.querySelector("#historyList"),
     };
 
     function setText(element, value) {
@@ -684,6 +696,28 @@ APP_HTML = """<!doctype html>
       }
     }
 
+    async function loadHistory() {
+      elements.historyLoadingText.textContent = "加载中...";
+      elements.historyEmptyState.classList.add("hidden");
+      elements.historyList.replaceChildren();
+
+      try {
+        const history = await fetchJson("/api/v1/reviews/history?limit=50");
+        if (!history.items.length) {
+          elements.historyEmptyState.classList.remove("hidden");
+          return;
+        }
+
+        history.items.forEach((item) => {
+          elements.historyList.appendChild(renderHistoryItem(item));
+        });
+      } catch (error) {
+        showError(`练习历史加载失败：${error.message}`);
+      } finally {
+        elements.historyLoadingText.textContent = "";
+      }
+    }
+
     function createDoneBlock(label, text) {
       const block = document.createElement("div");
       block.className = "done-block";
@@ -763,6 +797,70 @@ APP_HTML = """<!doctype html>
       return wrapper;
     }
 
+    function renderHistoryItem(item) {
+      const card = item.card;
+      const attempt = {
+        rating: item.rating,
+        created_at: item.created_at,
+        user_answer: item.user_answer,
+        scheduled_next_review_at: item.scheduled_next_review_at,
+      };
+      const wrapper = document.createElement("article");
+      wrapper.className = "done-item";
+
+      const title = document.createElement("h3");
+      title.className = "done-title";
+      title.textContent = card.title;
+
+      const meta = document.createElement("div");
+      meta.className = "done-meta";
+      [
+        formatOptionalDateTime(item.created_at),
+        card.category,
+        card.difficulty,
+        formatMappedValue(item.rating, ratingLabels),
+        formatMappedValue(card.mastery_level, masteryLabels),
+        formatOptionalDateTime(card.next_review_at),
+      ]
+        .filter(Boolean)
+        .forEach((value) => {
+          const chip = document.createElement("span");
+          chip.className = "chip";
+          chip.textContent = formatValue(value);
+          meta.appendChild(chip);
+        });
+
+      const scheduleBlock = document.createElement("div");
+      scheduleBlock.className = "done-block done-schedule";
+      const scheduleTitle = document.createElement("strong");
+      scheduleTitle.textContent = "历史调度信息";
+      const scheduleInfo = document.createElement("div");
+      scheduleInfo.className = "schedule-info";
+      fillScheduleInfo(scheduleInfo, card, attempt);
+      scheduleBlock.append(scheduleTitle, scheduleInfo);
+
+      const toggle = document.createElement("button");
+      toggle.className = "done-toggle";
+      toggle.type = "button";
+      toggle.textContent = "展开历史";
+
+      const detail = document.createElement("div");
+      detail.className = "done-detail";
+      detail.append(
+        createDoneBlock("题目", card.question),
+        createDoneBlock("我的回答", item.user_answer || "未记录"),
+        createDoneBlock("参考答案", card.reference_answer)
+      );
+
+      toggle.addEventListener("click", () => {
+        const visible = detail.classList.toggle("visible");
+        toggle.textContent = visible ? "收起历史" : "展开历史";
+      });
+
+      wrapper.append(title, meta, scheduleBlock, toggle, detail);
+      return wrapper;
+    }
+
     function renderCard(card) {
       state.currentCard = card;
       state.cardStartedAt = Date.now();
@@ -814,7 +912,7 @@ APP_HTML = """<!doctype html>
             elapsed_seconds: elapsedSeconds,
           }),
         });
-        await Promise.all([loadToday(), loadDoneToday()]);
+        await Promise.all([loadToday(), loadDoneToday(), loadHistory()]);
         showSuccess("提交成功");
       } catch (error) {
         showError(`提交失败：${error.message}`);
@@ -831,6 +929,7 @@ APP_HTML = """<!doctype html>
 
     loadToday();
     loadDoneToday();
+    loadHistory();
   </script>
 </body>
 </html>

@@ -10,6 +10,7 @@ from app.models.enums import (
     DifficultyLevel,
     KnowledgeCategory,
     MasteryLevel,
+    PracticeRating,
     QuestionType,
 )
 from app.services.review import ReviewService, balance_cards_by_category
@@ -30,7 +31,14 @@ def card_response(
         category=category,
         difficulty=DifficultyLevel.MEDIUM,
         question_type=QuestionType.KNOWLEDGE,
+        core_knowledge=f"Core knowledge for {title}",
+        question=f"Question about {title}",
+        reference_answer=f"Reference answer for {title}",
+        scoring_rules={},
+        tags=[],
+        source_reference="interview-week1-v4",
         mastery_level=mastery_level,
+        last_practiced_at=None,
         next_review_at=None,
         consecutive_correct_count=0,
         total_error_count=0,
@@ -42,6 +50,29 @@ def card_response(
 
 def item_ids(items: list[SimpleNamespace]) -> list[int]:
     return [item.id for item in items]
+
+
+def attempt_response(
+    *,
+    attempt_id: int,
+    card_id: int,
+    created_at: datetime = FIXED_NOW,
+    rating: PracticeRating = PracticeRating.CORRECT_EXPLAIN,
+    user_answer: str | None = "My answer",
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=attempt_id,
+        knowledge_card_id=card_id,
+        rating=rating,
+        is_correct=True,
+        used_hint=False,
+        user_answer=user_answer,
+        elapsed_seconds=30,
+        error_summary=None,
+        feedback=None,
+        scheduled_next_review_at=created_at,
+        created_at=created_at,
+    )
 
 
 def test_balance_cards_by_category_round_robins_multiple_categories() -> None:
@@ -270,3 +301,34 @@ def test_get_today_reviews_rejects_invalid_limit(limit: int) -> None:
 
     with pytest.raises(ValueError, match="limit must be between 1 and 50"):
         service.get_today_reviews(limit=limit)
+
+
+def test_get_practice_history_returns_recent_attempts_with_cards() -> None:
+    card = card_response(card_id=1, title="History card")
+    attempt = attempt_response(
+        attempt_id=10,
+        card_id=card.id,
+        user_answer="History answer",
+    )
+    attempt_repository = Mock()
+    attempt_repository.list_recent_with_cards.return_value = [(card, attempt)]
+    service = ReviewService(Mock(), attempt_repository)
+
+    response = service.get_practice_history(limit=25)
+
+    assert len(response.items) == 1
+    item = response.items[0]
+    assert item.attempt_id == attempt.id
+    assert item.rating is PracticeRating.CORRECT_EXPLAIN
+    assert item.user_answer == "History answer"
+    assert item.card.id == card.id
+    assert item.card.title == "History card"
+    attempt_repository.list_recent_with_cards.assert_called_once_with(limit=25)
+
+
+@pytest.mark.parametrize("limit", [0, 101])
+def test_get_practice_history_rejects_invalid_limit(limit: int) -> None:
+    service = ReviewService(Mock(), Mock())
+
+    with pytest.raises(ValueError, match="limit must be between 1 and 100"):
+        service.get_practice_history(limit=limit)

@@ -10,6 +10,8 @@ from app.repositories import KnowledgeCardRepository, PracticeAttemptRepository
 from app.schemas.review import (
     DoneTodayReviewItem,
     DoneTodayReviewResponse,
+    PracticeHistoryItem,
+    PracticeHistoryResponse,
     ReviewTodayResponse,
 )
 
@@ -169,5 +171,24 @@ class ReviewService:
             items=[
                 DoneTodayReviewItem(card=card, latest_attempt=latest_attempt)
                 for card, latest_attempt in rows
+            ]
+        )
+
+    def get_practice_history(self, limit: int = 50) -> PracticeHistoryResponse:
+        if limit < 1 or limit > 100:
+            raise ValueError("limit must be between 1 and 100.")
+
+        rows = self.attempt_repository.list_recent_with_cards(limit=limit)
+        return PracticeHistoryResponse(
+            items=[
+                PracticeHistoryItem(
+                    attempt_id=attempt.id,
+                    created_at=attempt.created_at,
+                    rating=attempt.rating,
+                    user_answer=attempt.user_answer,
+                    scheduled_next_review_at=attempt.scheduled_next_review_at,
+                    card=card,
+                )
+                for card, attempt in rows
             ]
         )
