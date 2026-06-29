@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import Mock
@@ -14,11 +14,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_knowledge_card_service
 from app.core.config import get_settings
 from app.main import app, create_app
-from app.models import KnowledgeCard
+from app.models import KnowledgeCard, PracticeAttempt
 from app.models.enums import (
     DifficultyLevel,
     KnowledgeCategory,
     MasteryLevel,
+    PracticeRating,
     QuestionType,
 )
 
@@ -424,6 +425,7 @@ async def test_get_list_default_pagination_and_limit_offset(
 
 async def test_get_list_filters_and_keyword_search(
     client: httpx.AsyncClient,
+    db_session: Session,
 ) -> None:
     target = await create_card(
         client,
@@ -434,10 +436,11 @@ async def test_get_list_filters_and_keyword_search(
         core_knowledge="Window function knowledge.",
         question="How do you test SQL rank results?",
     )
-    await client.patch(
-        f"/api/v1/cards/{target['id']}",
-        json={"mastery_level": "familiar", "is_active": False},
-    )
+    target_model = db_session.get(KnowledgeCard, target["id"])
+    assert target_model is not None
+    target_model.mastery_level = MasteryLevel.FAMILIAR
+    target_model.is_active = False
+    db_session.commit()
     await create_card(
         client,
         title="Python active card",
@@ -514,9 +517,10 @@ async def test_patch_updates_single_and_multiple_fields(
     multiple = await client.patch(
         f"/api/v1/cards/{created['id']}",
         json={
-            "difficulty": "hard",
+            "question": "Updated question?",
+            "core_knowledge": "Updated core knowledge.",
+            "reference_answer": "Updated reference answer.",
             "tags": ["updated"],
-            "scoring_rules": {"must_include": ["updated"]},
         },
     )
     detail = await client.get(f"/api/v1/cards/{created['id']}")
@@ -525,10 +529,12 @@ async def test_patch_updates_single_and_multiple_fields(
     assert single.json()["title"] == "Patched title"
     assert single.json()["category"] == created["category"]
     assert multiple.status_code == 200
-    assert multiple.json()["difficulty"] == "hard"
+    assert multiple.json()["question"] == "Updated question?"
+    assert multiple.json()["core_knowledge"] == "Updated core knowledge."
+    assert multiple.json()["reference_answer"] == "Updated reference answer."
     assert multiple.json()["tags"] == ["updated"]
     assert detail.json()["title"] == "Patched title"
-    assert detail.json()["difficulty"] == "hard"
+    assert detail.json()["reference_answer"] == "Updated reference answer."
 
 
 async def test_patch_validation_not_found_and_conflict(
@@ -545,7 +551,7 @@ async def test_patch_validation_not_found_and_conflict(
     )
     self_title = await client.patch(
         f"/api/v1/cards/{first['id']}",
-        json={"title": "First card", "category": "python"},
+        json={"title": "First card"},
     )
 
     assert second["category"] == "python"
@@ -554,6 +560,184 @@ async def test_patch_validation_not_found_and_conflict(
     assert conflict.status_code == 409
     assert self_title.status_code == 200
     assert self_title.json()["title"] == "First card"
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "id",
+        "source_reference",
+        "mastery_level",
+        "next_review_at",
+        "last_practiced_at",
+        "consecutive_correct_count",
+        "total_error_count",
+    ],
+)
+async def test_patch_rejects_read_only_fields(
+    client: httpx.AsyncClient,
+    field_name: str,
+) -> None:
+    created = await create_card(client, title="Read-only patch target")
+
+    response = await client.patch(
+        f"/api/v1/cards/{created['id']}",
+        json={field_name: "not editable"},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_patch_duplicate_title_is_source_aware(
+    client: httpx.AsyncClient,
+) -> None:
+    await create_card(
+        client,
+        title="V3 shared title",
+        category="real_business_case",
+        source_reference="interview-week1-v3",
+    )
+    v4_first = await create_card(
+        client,
+        title="V4 first title",
+        category="real_business_case",
+        source_reference="interview-week1-v4",
+    )
+    await create_card(
+        client,
+        title="V4 existing title",
+        category="real_business_case",
+        source_reference="interview-week1-v4",
+    )
+
+    cross_source = await client.patch(
+        f"/api/v1/cards/{v4_first['id']}",
+        json={"title": "V3 shared title"},
+    )
+    same_source_conflict = await client.patch(
+        f"/api/v1/cards/{v4_first['id']}",
+        json={"title": "V4 existing title"},
+    )
+
+    assert cross_source.status_code == 200
+    assert cross_source.json()["title"] == "V3 shared title"
+    assert same_source_conflict.status_code == 409
+
+
+async def test_patch_auth_enabled_protects_card_update(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    card = KnowledgeCard(
+        title="Auth patch card",
+        category=KnowledgeCategory.PYTHON,
+        core_knowledge="Auth patch core.",
+        question="Auth patch question.",
+        reference_answer="Auth patch answer.",
+    )
+    db_session.add(card)
+    db_session.commit()
+    db_session.refresh(card)
+    monkeypatch.setenv("OFFERFORGE_AUTH_ENABLED", "true")
+    monkeypatch.setenv("OFFERFORGE_AUTH_USERNAME", "offerforge")
+    monkeypatch.setenv("OFFERFORGE_AUTH_PASSWORD", "test-secret")
+    get_settings.cache_clear()
+
+    application = create_app()
+    transport = httpx.ASGITransport(app=application)
+    async with application.router.lifespan_context(application):
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        ) as auth_client:
+            health = await auth_client.get("/api/v1/health")
+            without_auth = await auth_client.patch(
+                f"/api/v1/cards/{card.id}",
+                json={"reference_answer": "Updated"},
+            )
+            with_auth = await auth_client.patch(
+                f"/api/v1/cards/{card.id}",
+                json={"reference_answer": "Updated"},
+                auth=("offerforge", "test-secret"),
+            )
+
+    assert health.status_code == 200
+    assert without_auth.status_code == 401
+    assert without_auth.headers["www-authenticate"] == "Basic"
+    assert with_auth.status_code == 200
+    assert with_auth.json()["reference_answer"] == "Updated"
+    get_settings.cache_clear()
+
+
+async def test_patch_does_not_modify_practice_attempt_or_schedule_fields(
+    client: httpx.AsyncClient,
+    db_session: Session,
+) -> None:
+    created = await create_card(client, title="Attempt safe patch")
+    card = db_session.get(KnowledgeCard, created["id"])
+    assert card is not None
+    card.mastery_level = MasteryLevel.FAMILIAR
+    card.last_practiced_at = datetime(2026, 6, 29, 9, 0, 0)
+    card.next_review_at = datetime(2026, 7, 3, 9, 0, 0)
+    card.consecutive_correct_count = 2
+    card.total_error_count = 1
+    attempt = PracticeAttempt(
+        knowledge_card_id=card.id,
+        rating=PracticeRating.CORRECT_EXPLAIN,
+        is_correct=True,
+        used_hint=False,
+        user_answer="Original user answer",
+        elapsed_seconds=42,
+        scheduled_next_review_at=datetime(2026, 7, 3, 9, 0, 0),
+        created_at=datetime(2026, 6, 29, 9, 1, 0),
+    )
+    db_session.add(attempt)
+    db_session.commit()
+    db_session.refresh(card)
+    db_session.refresh(attempt)
+    before_card = {
+        "mastery_level": card.mastery_level,
+        "last_practiced_at": card.last_practiced_at,
+        "next_review_at": card.next_review_at,
+        "consecutive_correct_count": card.consecutive_correct_count,
+        "total_error_count": card.total_error_count,
+    }
+    before_attempt = {
+        "user_answer": attempt.user_answer,
+        "rating": attempt.rating,
+        "created_at": attempt.created_at,
+        "scheduled_next_review_at": attempt.scheduled_next_review_at,
+    }
+
+    response = await client.patch(
+        f"/api/v1/cards/{card.id}",
+        json={
+            "reference_answer": "Updated reference answer.",
+            "tags": ["edited", "reference"],
+        },
+    )
+
+    assert response.status_code == 200
+    db_session.expire_all()
+    refreshed_card = db_session.get(KnowledgeCard, card.id)
+    refreshed_attempt = db_session.get(PracticeAttempt, attempt.id)
+    assert refreshed_card is not None
+    assert refreshed_attempt is not None
+    assert refreshed_card.reference_answer == "Updated reference answer."
+    assert refreshed_card.tags == ["edited", "reference"]
+    assert {
+        "mastery_level": refreshed_card.mastery_level,
+        "last_practiced_at": refreshed_card.last_practiced_at,
+        "next_review_at": refreshed_card.next_review_at,
+        "consecutive_correct_count": refreshed_card.consecutive_correct_count,
+        "total_error_count": refreshed_card.total_error_count,
+    } == before_card
+    assert {
+        "user_answer": refreshed_attempt.user_answer,
+        "rating": refreshed_attempt.rating,
+        "created_at": refreshed_attempt.created_at,
+        "scheduled_next_review_at": refreshed_attempt.scheduled_next_review_at,
+    } == before_attempt
 
 
 async def test_delete_card_returns_204_and_removes_card(

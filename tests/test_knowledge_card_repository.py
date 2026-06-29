@@ -145,13 +145,10 @@ def test_list_supports_combined_filters(db_session: Session) -> None:
             question_type=QuestionType.SQL,
         )
     )
-    repository.update(
-        target,
-        KnowledgeCardUpdate(
-            mastery_level=MasteryLevel.FAMILIAR,
-            is_active=False,
-        ),
-    )
+    target.mastery_level = MasteryLevel.FAMILIAR
+    target.is_active = False
+    db_session.commit()
+    db_session.refresh(target)
     repository.create(
         make_card_create(
             title="SQL easy question",
@@ -303,13 +300,13 @@ def test_update_changes_only_provided_fields_and_persists(
         card,
         KnowledgeCardUpdate(
             title="Updated Python list comprehension",
-            difficulty=DifficultyLevel.HARD,
+            reference_answer="Updated reference answer.",
             tags=["python", "updated"],
         ),
     )
 
     assert updated.title == "Updated Python list comprehension"
-    assert updated.difficulty is DifficultyLevel.HARD
+    assert updated.reference_answer == "Updated reference answer."
     assert updated.tags == ["python", "updated"]
     assert updated.category is original_category
     assert updated.question == original_question
@@ -318,7 +315,7 @@ def test_update_changes_only_provided_fields_and_persists(
     persisted = repository.get_by_id(card.id)
     assert persisted is not None
     assert persisted.title == "Updated Python list comprehension"
-    assert persisted.difficulty is DifficultyLevel.HARD
+    assert persisted.reference_answer == "Updated reference answer."
 
 
 def test_save_persists_direct_card_changes(db_session: Session) -> None:

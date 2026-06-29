@@ -280,6 +280,10 @@ APP_HTML = """<!doctype html>
       padding: 16px;
     }
 
+    .review-section {
+      margin-top: 30px;
+    }
+
     .done-header {
       display: flex;
       align-items: center;
@@ -291,6 +295,13 @@ APP_HTML = """<!doctype html>
     .done-header h2 {
       font-size: 1.08rem;
       line-height: 1.2;
+    }
+
+    .done-header .review-section-title {
+      font-size: 1.32rem;
+      line-height: 1.18;
+      font-weight: 800;
+      color: var(--text);
     }
 
     .done-loading {
@@ -334,6 +345,94 @@ APP_HTML = """<!doctype html>
       font-weight: 700;
       cursor: pointer;
       touch-action: manipulation;
+    }
+
+    .card-actions {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .edit-card-button,
+    .edit-save-button,
+    .edit-cancel-button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 8px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .edit-card-button {
+      width: 100%;
+      background: #f1eee6;
+      color: #6b4f18;
+    }
+
+    .card-edit-form {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fffdf8;
+    }
+
+    .card-edit-form label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .card-edit-form input,
+    .card-edit-form textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font: inherit;
+      font-weight: 400;
+      padding: 10px;
+      background: #ffffff;
+    }
+
+    .card-edit-form textarea {
+      min-height: 86px;
+      resize: vertical;
+    }
+
+    .edit-form-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .edit-save-button {
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    .edit-cancel-button {
+      background: #e7eee9;
+      color: var(--accent-strong);
+    }
+
+    .edit-form-error {
+      display: none;
+      padding: 10px;
+      border-radius: 8px;
+      background: var(--danger-bg);
+      color: var(--danger);
+      font-size: 0.92rem;
+    }
+
+    .edit-form-error.visible {
+      display: block;
     }
 
     .done-detail {
@@ -405,6 +504,11 @@ APP_HTML = """<!doctype html>
 
       <h2 id="cardTitle" class="title"></h2>
 
+      <div class="card-actions">
+        <button id="editCurrentCardButton" class="edit-card-button" type="button">编辑卡片</button>
+        <div id="currentEditContainer"></div>
+      </div>
+
       <div class="section">
         <h2>调度信息</h2>
         <div id="scheduleInfo" class="schedule-info"></div>
@@ -443,18 +547,18 @@ APP_HTML = """<!doctype html>
       </div>
     </section>
 
-    <section id="doneTodayPanel" class="panel done-section" aria-live="polite">
+    <section id="doneTodayPanel" class="panel done-section review-section" aria-live="polite">
       <div class="done-header">
-        <h2>今天已练习</h2>
+        <h2 class="review-section-title">今天已练习</h2>
         <span id="doneLoadingText" class="done-loading">加载中...</span>
       </div>
       <div id="doneEmptyState" class="empty hidden">今天还没有已练习卡片</div>
       <div id="doneList" class="done-list"></div>
     </section>
 
-    <section id="historyPanel" class="panel done-section" aria-live="polite">
+    <section id="historyPanel" class="panel done-section review-section" aria-live="polite">
       <div class="done-header">
-        <h2>练习历史</h2>
+        <h2 class="review-section-title">练习历史</h2>
         <span id="historyLoadingText" class="done-loading">加载中...</span>
       </div>
       <div id="historyEmptyState" class="empty hidden">暂无练习历史</div>
@@ -481,6 +585,8 @@ APP_HTML = """<!doctype html>
       masteryText: document.querySelector("#masteryText"),
       scheduleInfo: document.querySelector("#scheduleInfo"),
       cardTitle: document.querySelector("#cardTitle"),
+      editCurrentCardButton: document.querySelector("#editCurrentCardButton"),
+      currentEditContainer: document.querySelector("#currentEditContainer"),
       questionText: document.querySelector("#questionText"),
       showAnswerButton: document.querySelector("#showAnswerButton"),
       answerText: document.querySelector("#answerText"),
@@ -732,6 +838,124 @@ APP_HTML = """<!doctype html>
       return block;
     }
 
+    function parseTagsInput(value) {
+      return value
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+    }
+
+    function createEditField(labelText, value, multiline = false) {
+      const label = document.createElement("label");
+      label.textContent = labelText;
+
+      const field = multiline
+        ? document.createElement("textarea")
+        : document.createElement("input");
+      if (!multiline) {
+        field.type = "text";
+      }
+      field.value = value || "";
+      label.appendChild(field);
+      return {label, field};
+    }
+
+    function toggleCardEditor(card, container) {
+      if (container.childElementCount) {
+        container.replaceChildren();
+        return;
+      }
+      container.replaceChildren(createCardEditForm(card, container));
+    }
+
+    function createCardEditForm(card, container) {
+      const form = document.createElement("form");
+      form.className = "card-edit-form";
+
+      const titleField = createEditField("标题", card.title);
+      const questionField = createEditField("题目", card.question, true);
+      const coreField = createEditField("核心知识", card.core_knowledge, true);
+      const referenceField = createEditField("参考答案", card.reference_answer, true);
+      const tagsField = createEditField("标签（英文逗号分隔）", (card.tags || []).join(", "));
+
+      const error = document.createElement("div");
+      error.className = "edit-form-error";
+
+      const actions = document.createElement("div");
+      actions.className = "edit-form-actions";
+
+      const saveButton = document.createElement("button");
+      saveButton.className = "edit-save-button";
+      saveButton.type = "submit";
+      saveButton.textContent = "保存";
+
+      const cancelButton = document.createElement("button");
+      cancelButton.className = "edit-cancel-button";
+      cancelButton.type = "button";
+      cancelButton.textContent = "取消";
+      cancelButton.addEventListener("click", () => container.replaceChildren());
+
+      actions.append(saveButton, cancelButton);
+      form.append(
+        titleField.label,
+        questionField.label,
+        coreField.label,
+        referenceField.label,
+        tagsField.label,
+        error,
+        actions
+      );
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        clearError();
+        clearSuccess();
+        error.classList.remove("visible");
+        error.textContent = "";
+        saveButton.disabled = true;
+        cancelButton.disabled = true;
+
+        try {
+          await fetchJson(`/api/v1/cards/${card.id}`, {
+            method: "PATCH",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+              title: titleField.field.value,
+              question: questionField.field.value,
+              core_knowledge: coreField.field.value,
+              reference_answer: referenceField.field.value,
+              tags: parseTagsInput(tagsField.field.value),
+            }),
+          });
+          showSuccess("卡片已更新");
+          await Promise.all([loadToday(), loadDoneToday(), loadHistory()]);
+        } catch (saveError) {
+          error.textContent = `保存失败：${saveError.message}`;
+          error.classList.add("visible");
+          saveButton.disabled = false;
+          cancelButton.disabled = false;
+        }
+      });
+
+      return form;
+    }
+
+    function createEditCardControls(card) {
+      const actions = document.createElement("div");
+      actions.className = "card-actions";
+
+      const button = document.createElement("button");
+      button.className = "edit-card-button";
+      button.type = "button";
+      button.textContent = "编辑卡片";
+
+      const container = document.createElement("div");
+      button.addEventListener("click", () => toggleCardEditor(card, container));
+
+      actions.append(button, container);
+      return actions;
+    }
+
     function renderDoneItem(item) {
       const card = item.card;
       const attempt = item.latest_attempt;
@@ -793,7 +1017,7 @@ APP_HTML = """<!doctype html>
       });
 
       scheduleBlock.classList.add("done-schedule");
-      wrapper.append(title, meta, scheduleBlock, toggle, detail);
+      wrapper.append(title, meta, createEditCardControls(card), scheduleBlock, toggle, detail);
       return wrapper;
     }
 
@@ -857,7 +1081,7 @@ APP_HTML = """<!doctype html>
         toggle.textContent = visible ? "收起历史" : "展开历史";
       });
 
-      wrapper.append(title, meta, scheduleBlock, toggle, detail);
+      wrapper.append(title, meta, createEditCardControls(card), scheduleBlock, toggle, detail);
       return wrapper;
     }
 
@@ -872,6 +1096,7 @@ APP_HTML = """<!doctype html>
       setText(elements.questionText, card.question);
       setText(elements.answerText, card.reference_answer);
       fillScheduleInfo(elements.scheduleInfo, card);
+      elements.currentEditContainer.replaceChildren();
       elements.answerInput.value = "";
       elements.answerText.classList.remove("visible");
       elements.showAnswerButton.textContent = "显示答案";
@@ -923,6 +1148,11 @@ APP_HTML = """<!doctype html>
     }
 
     elements.showAnswerButton.addEventListener("click", toggleAnswer);
+    elements.editCurrentCardButton.addEventListener("click", () => {
+      if (state.currentCard) {
+        toggleCardEditor(state.currentCard, elements.currentEditContainer);
+      }
+    });
     elements.ratingButtons.forEach((button) => {
       button.addEventListener("click", () => submitRating(button.dataset.rating));
     });

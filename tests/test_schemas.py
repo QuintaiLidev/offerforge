@@ -96,15 +96,17 @@ def test_knowledge_card_create_rejects_invalid_category() -> None:
 def test_knowledge_card_update_accepts_single_and_multiple_fields() -> None:
     single = KnowledgeCardUpdate(title="  Updated title  ")
     multiple = KnowledgeCardUpdate(
-        difficulty=DifficultyLevel.HARD,
+        question="  Updated question  ",
+        core_knowledge="Updated core knowledge.",
+        reference_answer="Updated reference answer.",
         tags=["sql", "join"],
-        scoring_rules={"must_include": ["left join", "null"]},
     )
 
     assert single.title == "Updated title"
-    assert multiple.difficulty is DifficultyLevel.HARD
+    assert multiple.question == "Updated question"
+    assert multiple.core_knowledge == "Updated core knowledge."
+    assert multiple.reference_answer == "Updated reference answer."
     assert multiple.tags == ["sql", "join"]
-    assert multiple.scoring_rules == {"must_include": ["left join", "null"]}
 
 
 def test_knowledge_card_update_rejects_empty_update() -> None:
@@ -127,6 +129,28 @@ def test_knowledge_card_update_rejects_empty_string_fields(
 ) -> None:
     with pytest.raises(ValidationError):
         KnowledgeCardUpdate(**{field_name: value})
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "id",
+        "category",
+        "difficulty",
+        "question_type",
+        "scoring_rules",
+        "source_reference",
+        "mastery_level",
+        "last_practiced_at",
+        "next_review_at",
+        "consecutive_correct_count",
+        "total_error_count",
+        "is_active",
+    ],
+)
+def test_knowledge_card_update_rejects_read_only_fields(field_name: str) -> None:
+    with pytest.raises(ValidationError):
+        KnowledgeCardUpdate(**{field_name: "not editable"})
 
 
 def test_knowledge_card_read_can_validate_from_attributes() -> None:

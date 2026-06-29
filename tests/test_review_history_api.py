@@ -230,3 +230,68 @@ async def test_history_auth_and_health_behavior_when_auth_enabled(
     assert without_auth.status_code == 401
     assert without_auth.headers["www-authenticate"] == "Basic"
     assert with_auth.status_code == 200
+
+
+async def test_card_edit_is_reflected_in_review_views_without_changing_attempt(
+    client: httpx.AsyncClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    card = create_card(db_session, title="Original review title")
+    attempt = create_attempt(
+        db_session,
+        card_id=card.id,
+        created_at=FIXED_NOW - timedelta(minutes=10),
+        rating=PracticeRating.CORRECT_EXPLAIN,
+        user_answer="Original user answer",
+    )
+    before_attempt = {
+        "user_answer": attempt.user_answer,
+        "rating": attempt.rating,
+        "created_at": attempt.created_at,
+        "scheduled_next_review_at": attempt.scheduled_next_review_at,
+    }
+    monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
+
+    updated = await client.patch(
+        f"/api/v1/cards/{card.id}",
+        json={
+            "title": "Edited review title",
+            "question": "Edited review question",
+            "core_knowledge": "Edited review core",
+            "reference_answer": "Edited review reference answer",
+            "tags": ["edited", "history"],
+        },
+    )
+    today = await client.get("/api/v1/reviews/today")
+    done_today = await client.get("/api/v1/reviews/done-today")
+    history = await client.get("/api/v1/reviews/history")
+
+    assert updated.status_code == 200
+    assert today.status_code == 200
+    assert done_today.status_code == 200
+    assert history.status_code == 200
+    assert today.json()["items"][0]["title"] == "Edited review title"
+    done_item = done_today.json()["items"][0]
+    history_item = history.json()["items"][0]
+    for item in (done_item, history_item):
+        assert item["card"]["title"] == "Edited review title"
+        assert item["card"]["question"] == "Edited review question"
+        assert item["card"]["core_knowledge"] == "Edited review core"
+        assert item["card"]["reference_answer"] == "Edited review reference answer"
+        assert item["card"]["tags"] == ["edited", "history"]
+    assert history_item["user_answer"] == before_attempt["user_answer"]
+    assert history_item["rating"] == before_attempt["rating"].value
+    assert history_item["created_at"] == before_attempt["created_at"].isoformat()
+    assert history_item["scheduled_next_review_at"] == (
+        before_attempt["scheduled_next_review_at"].isoformat()
+    )
+    db_session.expire_all()
+    refreshed_attempt = db_session.get(PracticeAttempt, attempt.id)
+    assert refreshed_attempt is not None
+    assert {
+        "user_answer": refreshed_attempt.user_answer,
+        "rating": refreshed_attempt.rating,
+        "created_at": refreshed_attempt.created_at,
+        "scheduled_next_review_at": refreshed_attempt.scheduled_next_review_at,
+    } == before_attempt

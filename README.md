@@ -204,6 +204,8 @@ Bulk card import is available through `POST /api/v1/cards/bulk` with a JSON arra
 
 Practice history: `/app` can show recent practice attempts, including rating, user answer, card information, and next review time.
 
+Card editing: `/app` supports editing card title, question, core knowledge, reference answer, and tags.
+
 ## Balanced review queue
 
 `GET /api/v1/reviews/today` balances returned cards across categories where possible. It uses a deterministic daily shuffle inside each category, so refreshing on the same day keeps the queue stable while the next day can reshuffle. Due cards still take priority, new cards only fill remaining slots, and scheduling intervals remain owned by the five-rating rules.

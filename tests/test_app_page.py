@@ -46,9 +46,16 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "text/html" in response.headers["content-type"]
     assert "OfferForge" in response.text
     assert "练习历史" in response.text
+    assert "review-section-title" in response.text
     assert "historyList" in response.text
     assert "展开历史" in response.text
     assert "我的回答" in response.text
+    assert "编辑卡片" in response.text
+    assert "edit-card-button" in response.text
+    assert "card-edit-form" in response.text
+    assert "createCardEditForm" in response.text
+    assert "parseTagsInput" in response.text
+    assert "reference_answer" in response.text
     assert "今日复习" in response.text
     assert "今天已练习" in response.text
     assert "查看答案" in response.text
@@ -68,6 +75,8 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "/api/v1/reviews/today" in response.text
     assert "/api/v1/reviews/done-today" in response.text
     assert "/api/v1/reviews/history?limit=50" in response.text
+    assert "/api/v1/cards/${card.id}" in response.text
+    assert 'method: "PATCH"' in response.text
     assert "/api/v1/practice-attempts" in response.text
     assert "loadHistory()" in response.text
     assert "Promise.all([loadToday(), loadDoneToday(), loadHistory()])" in response.text

@@ -196,26 +196,19 @@ class KnowledgeCardService:
     ) -> KnowledgeCard:
         card = self.get_card(card_id)
         updated_fields = data.model_dump(exclude_unset=True)
-        changes_identity = any(
-            field_name in updated_fields
-            for field_name in ("source_reference", "category", "title")
-        )
-
-        final_source_reference = (
-            data.source_reference
-            if "source_reference" in updated_fields
-            else card.source_reference
-        )
-        final_category = (
-            data.category if "category" in updated_fields else card.category
-        )
+        final_source_reference = card.source_reference
+        final_category = card.category
         final_title = data.title if "title" in updated_fields else card.title
 
-        if changes_identity and self.repository.exists_by_source_category_and_title(
-            final_source_reference,
-            final_category,
-            final_title,
-            exclude_id=card.id,
+        if (
+            "title" in updated_fields
+            and final_title != card.title
+            and self.repository.exists_by_source_category_and_title(
+                final_source_reference,
+                final_category,
+                final_title,
+                exclude_id=card.id,
+            )
         ):
             raise DuplicateKnowledgeCardError(
                 final_category,
