@@ -145,6 +145,10 @@ data/offerforge.db
 
 该文件是本地运行数据，不提交到 Git。测试会使用临时 SQLite 数据库，不写入正式数据库。
 
+## Database configuration
+
+By default OfferForge uses local SQLite at `data/offerforge.db`. For an external database, set `OFFERFORGE_DATABASE_URL` or `DATABASE_URL`; priority is `OFFERFORGE_DATABASE_URL` > `DATABASE_URL` > local SQLite. PostgreSQL URLs such as `postgresql://...` are supported for hosted databases such as Neon. Do not commit real database URLs, usernames, passwords, or `.env` files.
+
 ## Deployment
 
 本项目支持本地运行和私人云端部署。云端部署前必须配置 Basic Auth，并把 SQLite 数据库放到持久化磁盘或 volume。

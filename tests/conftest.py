@@ -20,6 +20,8 @@ def pytest_configure(config: pytest.Config) -> None:
     _PREVIOUS_ENV = {
         "OFFERFORGE_TESTING": os.environ.get("OFFERFORGE_TESTING"),
         "OFFERFORGE_DATABASE_PATH": os.environ.get("OFFERFORGE_DATABASE_PATH"),
+        "OFFERFORGE_DATABASE_URL": os.environ.get("OFFERFORGE_DATABASE_URL"),
+        "DATABASE_URL": os.environ.get("DATABASE_URL"),
         "OFFERFORGE_AUTO_SEED_ON_STARTUP": os.environ.get(
             "OFFERFORGE_AUTO_SEED_ON_STARTUP"
         ),
@@ -29,6 +31,8 @@ def pytest_configure(config: pytest.Config) -> None:
     _TEST_DB_PATH = _TEST_DB_DIR / "offerforge_test.db"
     os.environ["OFFERFORGE_TESTING"] = "1"
     os.environ["OFFERFORGE_DATABASE_PATH"] = str(_TEST_DB_PATH)
+    os.environ.pop("OFFERFORGE_DATABASE_URL", None)
+    os.environ.pop("DATABASE_URL", None)
     os.environ["OFFERFORGE_AUTO_SEED_ON_STARTUP"] = "false"
 
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from sqlalchemy import inspect, text
@@ -36,6 +38,33 @@ def test_database_initialization_uses_test_database(test_db_path: Path) -> None:
         default_db_stat_after = DEFAULT_DATABASE_PATH.stat()
         assert default_db_stat_after.st_size == default_db_stat_before.st_size
         assert default_db_stat_after.st_mtime_ns == default_db_stat_before.st_mtime_ns
+
+
+def test_init_db_skips_sqlite_specific_logic_for_postgresql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakePostgresEngine:
+        def connect(self) -> None:
+            raise AssertionError("PostgreSQL init should use create_all on engine.")
+
+    engine = FakePostgresEngine()
+    create_all_calls: list[Any] = []
+
+    def fake_create_all(*, bind: Any) -> None:
+        create_all_calls.append(bind)
+
+    monkeypatch.setattr(
+        "app.db.init_db.get_settings",
+        lambda: SimpleNamespace(
+            database_url="postgresql://user:pass@db.example.com/offerforge"
+        ),
+    )
+    monkeypatch.setattr("app.db.init_db.engine", engine)
+    monkeypatch.setattr(Base.metadata, "create_all", fake_create_all)
+
+    init_db()
+
+    assert create_all_calls == [engine]
 
 
 def test_init_db_migrates_legacy_card_uniqueness_to_source_aware() -> None:

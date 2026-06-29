@@ -1,25 +1,38 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from sqlalchemy import MetaData, text
-from sqlalchemy.engine import Connection
+from sqlalchemy.engine import Connection, make_url
 from sqlalchemy.schema import CreateTable
 
 from app.core.config import get_settings
 from app.db.base import Base
-from app.db.session import engine
+from app.db.session import engine, is_sqlite_database_url
 from app.models import KnowledgeCard, PracticeAttempt
 
 
 def init_db() -> None:
     _ = (KnowledgeCard, PracticeAttempt)
     settings = get_settings()
-    settings.database_path.parent.mkdir(parents=True, exist_ok=True)
+    if not is_sqlite_database_url(settings.database_url):
+        Base.metadata.create_all(bind=engine)
+        return
+
+    _ensure_sqlite_database_parent(settings.database_url)
 
     with engine.connect() as connection:
         connection.execute(text("PRAGMA foreign_keys=ON"))
         Base.metadata.create_all(bind=connection)
         connection.commit()
         _migrate_legacy_knowledge_card_uniqueness(connection)
+
+
+def _ensure_sqlite_database_parent(database_url: str) -> None:
+    database_path = make_url(database_url).database
+    if not database_path or database_path == ":memory:":
+        return
+    Path(database_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
 
 
 def _migrate_legacy_knowledge_card_uniqueness(connection: Connection) -> None:

@@ -20,6 +20,7 @@ class Settings(BaseModel):
     app_name: str = "OfferForge"
     api_v1_prefix: str = "/api/v1"
     database_path: Path = DEFAULT_DATABASE_PATH
+    database_url_override: str | None = None
     testing: bool = False
     host: str = "127.0.0.1"
     port: int = 8000
@@ -35,6 +36,21 @@ class Settings(BaseModel):
         if value.is_absolute():
             return value
         return (PROJECT_ROOT / value).resolve()
+
+    @field_validator("database_url_override", mode="before")
+    @classmethod
+    def normalize_database_url_override(cls, value: object) -> object:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            return value
+
+        stripped = value.strip()
+        if not stripped:
+            return None
+        if stripped.startswith("postgres://"):
+            return "postgresql://" + stripped[len("postgres://") :]
+        return stripped
 
     @field_validator("auto_seed_path", mode="after")
     @classmethod
@@ -56,6 +72,8 @@ class Settings(BaseModel):
 
     @property
     def database_url(self) -> str:
+        if self.database_url_override is not None:
+            return self.database_url_override
         return f"sqlite:///{self.database_path.as_posix()}"
 
 
@@ -80,6 +98,9 @@ def _read_int(value: str | None, default: int) -> int:
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if environ is None else environ
     testing = _read_bool(env.get("OFFERFORGE_TESTING"), False)
+    database_url_override = env.get("OFFERFORGE_DATABASE_URL") or env.get(
+        "DATABASE_URL"
+    )
 
     return Settings(
         app_name=env.get("OFFERFORGE_APP_NAME", "OfferForge"),
@@ -87,6 +108,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         database_path=Path(
             env.get("OFFERFORGE_DATABASE_PATH", str(DEFAULT_DATABASE_PATH))
         ),
+        database_url_override=database_url_override,
         testing=testing,
         host=env.get("OFFERFORGE_HOST", "127.0.0.1"),
         port=_read_int(env.get("OFFERFORGE_PORT"), 8000),
