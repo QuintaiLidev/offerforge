@@ -119,6 +119,22 @@ class KnowledgeCardRepository:
             summaries.append((source_reference, total, active, total - active))
         return summaries
 
+    def list_ids_by_source_reference(self, source_reference: str) -> list[int]:
+        statement = (
+            select(KnowledgeCard.id)
+            .where(KnowledgeCard.source_reference == source_reference)
+            .order_by(KnowledgeCard.id.asc())
+        )
+        return list(self.session.scalars(statement).all())
+
+    def count_by_source_reference(self, source_reference: str) -> int:
+        statement = (
+            select(func.count())
+            .select_from(KnowledgeCard)
+            .where(KnowledgeCard.source_reference == source_reference)
+        )
+        return self.session.scalar(statement) or 0
+
     def list_due_for_review(
         self,
         now: datetime,
@@ -208,6 +224,22 @@ class KnowledgeCardRepository:
         cards = list(self.session.scalars(statement).all())
         for card in cards:
             card.is_active = is_active
+
+        try:
+            self.session.commit()
+        except SQLAlchemyError:
+            self.session.rollback()
+            raise
+
+        return len(cards)
+
+    def delete_by_source_reference(self, source_reference: str) -> int:
+        statement = select(KnowledgeCard).where(
+            KnowledgeCard.source_reference == source_reference
+        )
+        cards = list(self.session.scalars(statement).all())
+        for card in cards:
+            self.session.delete(card)
 
         try:
             self.session.commit()

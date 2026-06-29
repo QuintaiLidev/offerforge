@@ -172,3 +172,8 @@ class KnowledgeCardSourceActiveUpdateResponse(SchemaModel):
     source_reference: str
     updated_count: int = Field(ge=0)
     is_active: bool
+
+
+class KnowledgeCardSourceDeleteResponse(SchemaModel):
+    source_reference: str
+    deleted_count: int = Field(ge=0)

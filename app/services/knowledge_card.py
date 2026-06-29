@@ -9,15 +9,17 @@ from app.models.enums import (
     MasteryLevel,
     QuestionType,
 )
-from app.repositories import KnowledgeCardRepository
+from app.repositories import KnowledgeCardRepository, PracticeAttemptRepository
 from app.schemas.knowledge_card import (
     KnowledgeCardCreate,
     KnowledgeCardSourceActiveUpdateResponse,
+    KnowledgeCardSourceDeleteResponse,
     KnowledgeCardSourceSummary,
     KnowledgeCardUpdate,
 )
 from app.services.exceptions import (
     DuplicateKnowledgeCardError,
+    KnowledgeCardSourceHasAttemptsError,
     KnowledgeCardNotFoundError,
     KnowledgeCardSourceNotFoundError,
 )
@@ -32,8 +34,13 @@ def _is_category_title_unique_constraint_error(exc: IntegrityError) -> bool:
 
 
 class KnowledgeCardService:
-    def __init__(self, repository: KnowledgeCardRepository) -> None:
+    def __init__(
+        self,
+        repository: KnowledgeCardRepository,
+        attempt_repository: PracticeAttemptRepository | None = None,
+    ) -> None:
         self.repository = repository
+        self.attempt_repository = attempt_repository
 
     def create_card(self, data: KnowledgeCardCreate) -> KnowledgeCard:
         if self.repository.exists_by_category_and_title(data.category, data.title):
@@ -119,6 +126,27 @@ class KnowledgeCardService:
             source_reference=source_reference,
             updated_count=updated_count,
             is_active=is_active,
+        )
+
+    def delete_source_reference(
+        self,
+        source_reference: str,
+    ) -> KnowledgeCardSourceDeleteResponse:
+        card_ids = self.repository.list_ids_by_source_reference(source_reference)
+        if not card_ids:
+            raise KnowledgeCardSourceNotFoundError(source_reference)
+
+        if self.attempt_repository is None:
+            raise RuntimeError("Practice attempt repository is required.")
+
+        attempts_count = self.attempt_repository.count_by_knowledge_card_ids(card_ids)
+        if attempts_count > 0:
+            raise KnowledgeCardSourceHasAttemptsError(source_reference)
+
+        deleted_count = self.repository.delete_by_source_reference(source_reference)
+        return KnowledgeCardSourceDeleteResponse(
+            source_reference=source_reference,
+            deleted_count=deleted_count,
         )
 
     def update_card(

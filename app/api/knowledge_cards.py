@@ -27,11 +27,13 @@ from app.schemas.knowledge_card import (
     KnowledgeCardRead,
     KnowledgeCardSourceActiveUpdate,
     KnowledgeCardSourceActiveUpdateResponse,
+    KnowledgeCardSourceDeleteResponse,
     KnowledgeCardSourceSummaryResponse,
     KnowledgeCardUpdate,
 )
 from app.services import (
     DuplicateKnowledgeCardError,
+    KnowledgeCardSourceHasAttemptsError,
     KnowledgeCardNotFoundError,
     KnowledgeCardSourceNotFoundError,
     KnowledgeCardService,
@@ -171,6 +173,37 @@ def set_knowledge_card_source_active(
     except KnowledgeCardSourceNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete(
+    "/sources/{source_reference}",
+    response_model=KnowledgeCardSourceDeleteResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Delete knowledge cards from a source",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Knowledge card source not found"},
+        status.HTTP_409_CONFLICT: {
+            "description": "Knowledge card source has practice attempts"
+        },
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Validation error"},
+    },
+)
+def delete_knowledge_card_source(
+    source_reference: SourceReferencePath,
+    service: KnowledgeCardServiceDep,
+) -> KnowledgeCardSourceDeleteResponse:
+    try:
+        return service.delete_source_reference(source_reference)
+    except KnowledgeCardSourceNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except KnowledgeCardSourceHasAttemptsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
 

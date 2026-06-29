@@ -68,6 +68,17 @@ class PracticeAttemptRepository:
         )
         return self.session.scalar(statement)
 
+    def count_by_knowledge_card_ids(self, card_ids: list[int]) -> int:
+        if not card_ids:
+            return 0
+
+        statement = (
+            select(func.count())
+            .select_from(PracticeAttempt)
+            .where(PracticeAttempt.knowledge_card_id.in_(card_ids))
+        )
+        return self.session.scalar(statement) or 0
+
     def list_latest_attempts_by_card_for_period(
         self,
         *,

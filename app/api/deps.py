@@ -13,8 +13,9 @@ from app.services import KnowledgeCardService, PracticeAttemptService, ReviewSer
 def get_knowledge_card_service(
     db: Annotated[Session, Depends(get_db)],
 ) -> KnowledgeCardService:
-    repository = KnowledgeCardRepository(db)
-    return KnowledgeCardService(repository)
+    card_repository = KnowledgeCardRepository(db)
+    attempt_repository = PracticeAttemptRepository(db)
+    return KnowledgeCardService(card_repository, attempt_repository)
 
 
 def get_practice_attempt_service(

@@ -21,6 +21,15 @@ class KnowledgeCardSourceNotFoundError(ServiceError):
         )
 
 
+class KnowledgeCardSourceHasAttemptsError(ServiceError):
+    def __init__(self, source_reference: str) -> None:
+        self.source_reference = source_reference
+        super().__init__(
+            "Cannot delete source_reference because practice attempts exist "
+            "for these cards."
+        )
+
+
 class DuplicateKnowledgeCardError(ServiceError):
     def __init__(self, category: KnowledgeCategory, title: str) -> None:
         self.category = category
