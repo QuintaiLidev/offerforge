@@ -21,9 +21,10 @@ class KnowledgeCard(Base):
     __tablename__ = "knowledge_cards"
     __table_args__ = (
         UniqueConstraint(
+            "source_reference",
             "category",
             "title",
-            name="uq_knowledge_cards_category_title",
+            name="uq_knowledge_cards_source_category_title",
         ),
         Index("ix_knowledge_cards_category", "category"),
         Index("ix_knowledge_cards_difficulty", "difficulty"),

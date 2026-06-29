@@ -28,6 +28,7 @@ def make_card(
     card_id: int = 1,
     title: str = "Python list comprehension",
     category: KnowledgeCategory = KnowledgeCategory.PYTHON,
+    source_reference: str | None = None,
 ) -> KnowledgeCard:
     card = KnowledgeCard(
         title=title,
@@ -35,6 +36,7 @@ def make_card(
         core_knowledge=f"Core knowledge for {title}",
         question=f"Question about {title}",
         reference_answer=f"Reference answer for {title}",
+        source_reference=source_reference,
     )
     card.id = card_id
     return card
@@ -61,13 +63,14 @@ def make_repository_mock() -> Mock:
     return Mock(spec=KnowledgeCardRepository)
 
 
-def make_unique_title_integrity_error() -> IntegrityError:
+def make_unique_card_identity_integrity_error() -> IntegrityError:
     return IntegrityError(
         "statement",
         {"title": "duplicate"},
         Exception(
             "UNIQUE constraint failed: "
-            "knowledge_cards.category, knowledge_cards.title"
+            "knowledge_cards.source_reference, knowledge_cards.category, "
+            "knowledge_cards.title"
         ),
     )
 
@@ -85,13 +88,14 @@ def test_create_card_calls_repository_when_no_duplicate() -> None:
     service = KnowledgeCardService(repository)
     data = make_card_create()
     card = make_card()
-    repository.exists_by_category_and_title.return_value = False
+    repository.exists_by_source_category_and_title.return_value = False
     repository.create.return_value = card
 
     result = service.create_card(data)
 
     assert result == card
-    repository.exists_by_category_and_title.assert_called_once_with(
+    repository.exists_by_source_category_and_title.assert_called_once_with(
+        None,
         KnowledgeCategory.PYTHON,
         "Python list comprehension",
     )
@@ -102,13 +106,14 @@ def test_create_card_rejects_preexisting_duplicate() -> None:
     repository = make_repository_mock()
     service = KnowledgeCardService(repository)
     data = make_card_create()
-    repository.exists_by_category_and_title.return_value = True
+    repository.exists_by_source_category_and_title.return_value = True
 
     with pytest.raises(DuplicateKnowledgeCardError) as exc_info:
         service.create_card(data)
 
     assert exc_info.value.category is KnowledgeCategory.PYTHON
     assert exc_info.value.title == "Python list comprehension"
+    assert exc_info.value.source_reference is None
     repository.create.assert_not_called()
 
 
@@ -116,8 +121,8 @@ def test_create_card_converts_integrity_error_and_keeps_cause() -> None:
     repository = make_repository_mock()
     service = KnowledgeCardService(repository)
     data = make_card_create()
-    integrity_error = make_unique_title_integrity_error()
-    repository.exists_by_category_and_title.return_value = False
+    integrity_error = make_unique_card_identity_integrity_error()
+    repository.exists_by_source_category_and_title.return_value = False
     repository.create.side_effect = integrity_error
 
     with pytest.raises(DuplicateKnowledgeCardError) as exc_info:
@@ -133,7 +138,7 @@ def test_create_card_does_not_swallow_unrelated_exceptions() -> None:
     service = KnowledgeCardService(repository)
     data = make_card_create()
     unrelated_error = RuntimeError("database is unavailable")
-    repository.exists_by_category_and_title.return_value = False
+    repository.exists_by_source_category_and_title.return_value = False
     repository.create.side_effect = unrelated_error
 
     with pytest.raises(RuntimeError) as exc_info:
@@ -147,7 +152,7 @@ def test_create_card_does_not_convert_other_integrity_errors() -> None:
     service = KnowledgeCardService(repository)
     data = make_card_create()
     integrity_error = make_other_integrity_error()
-    repository.exists_by_category_and_title.return_value = False
+    repository.exists_by_source_category_and_title.return_value = False
     repository.create.side_effect = integrity_error
 
     with pytest.raises(IntegrityError) as exc_info:
@@ -251,7 +256,7 @@ def test_update_card_updates_plain_fields_without_duplicate_check() -> None:
     result = service.update_card(card.id, data)
 
     assert result == updated
-    repository.exists_by_category_and_title.assert_not_called()
+    repository.exists_by_source_category_and_title.assert_not_called()
     repository.update.assert_called_once_with(card, data)
 
 
@@ -260,13 +265,14 @@ def test_update_card_checks_duplicate_when_title_changes() -> None:
     service = KnowledgeCardService(repository)
     card = make_card(card_id=7, title="Old title")
     repository.get_by_id.return_value = card
-    repository.exists_by_category_and_title.return_value = False
+    repository.exists_by_source_category_and_title.return_value = False
     repository.update.return_value = card
     data = KnowledgeCardUpdate(title="New title")
 
     service.update_card(card.id, data)
 
-    repository.exists_by_category_and_title.assert_called_once_with(
+    repository.exists_by_source_category_and_title.assert_called_once_with(
+        None,
         KnowledgeCategory.PYTHON,
         "New title",
         exclude_id=7,
@@ -278,16 +284,41 @@ def test_update_card_checks_duplicate_when_category_changes() -> None:
     service = KnowledgeCardService(repository)
     card = make_card(card_id=8, title="Same title", category=KnowledgeCategory.PYTHON)
     repository.get_by_id.return_value = card
-    repository.exists_by_category_and_title.return_value = False
+    repository.exists_by_source_category_and_title.return_value = False
     repository.update.return_value = card
     data = KnowledgeCardUpdate(category=KnowledgeCategory.SQL)
 
     service.update_card(card.id, data)
 
-    repository.exists_by_category_and_title.assert_called_once_with(
+    repository.exists_by_source_category_and_title.assert_called_once_with(
+        None,
         KnowledgeCategory.SQL,
         "Same title",
         exclude_id=8,
+    )
+
+
+def test_update_card_checks_duplicate_when_source_reference_changes() -> None:
+    repository = make_repository_mock()
+    service = KnowledgeCardService(repository)
+    card = make_card(
+        card_id=14,
+        title="Same title",
+        category=KnowledgeCategory.PYTHON,
+        source_reference="interview-week1-v3",
+    )
+    repository.get_by_id.return_value = card
+    repository.exists_by_source_category_and_title.return_value = False
+    repository.update.return_value = card
+    data = KnowledgeCardUpdate(source_reference="interview-week1-v4")
+
+    service.update_card(card.id, data)
+
+    repository.exists_by_source_category_and_title.assert_called_once_with(
+        "interview-week1-v4",
+        KnowledgeCategory.PYTHON,
+        "Same title",
+        exclude_id=14,
     )
 
 
@@ -296,7 +327,7 @@ def test_update_card_checks_duplicate_with_final_title_and_category() -> None:
     service = KnowledgeCardService(repository)
     card = make_card(card_id=9, title="Old title", category=KnowledgeCategory.PYTHON)
     repository.get_by_id.return_value = card
-    repository.exists_by_category_and_title.return_value = False
+    repository.exists_by_source_category_and_title.return_value = False
     repository.update.return_value = card
     data = KnowledgeCardUpdate(
         title="Final title",
@@ -305,7 +336,8 @@ def test_update_card_checks_duplicate_with_final_title_and_category() -> None:
 
     service.update_card(card.id, data)
 
-    repository.exists_by_category_and_title.assert_called_once_with(
+    repository.exists_by_source_category_and_title.assert_called_once_with(
+        None,
         KnowledgeCategory.SQL,
         "Final title",
         exclude_id=9,
@@ -317,7 +349,7 @@ def test_update_card_rejects_duplicate_and_does_not_update() -> None:
     service = KnowledgeCardService(repository)
     card = make_card(card_id=10)
     repository.get_by_id.return_value = card
-    repository.exists_by_category_and_title.return_value = True
+    repository.exists_by_source_category_and_title.return_value = True
 
     with pytest.raises(DuplicateKnowledgeCardError) as exc_info:
         service.update_card(card.id, KnowledgeCardUpdate(title="Existing title"))
@@ -332,14 +364,15 @@ def test_update_card_does_not_misjudge_current_title_as_duplicate() -> None:
     service = KnowledgeCardService(repository)
     card = make_card(card_id=11, title="Same title")
     repository.get_by_id.return_value = card
-    repository.exists_by_category_and_title.return_value = False
+    repository.exists_by_source_category_and_title.return_value = False
     repository.update.return_value = card
     data = KnowledgeCardUpdate(title="Same title")
 
     result = service.update_card(card.id, data)
 
     assert result == card
-    repository.exists_by_category_and_title.assert_called_once_with(
+    repository.exists_by_source_category_and_title.assert_called_once_with(
+        None,
         KnowledgeCategory.PYTHON,
         "Same title",
         exclude_id=11,
@@ -351,9 +384,9 @@ def test_update_card_converts_integrity_error_and_keeps_cause() -> None:
     repository = make_repository_mock()
     service = KnowledgeCardService(repository)
     card = make_card(card_id=12)
-    integrity_error = make_unique_title_integrity_error()
+    integrity_error = make_unique_card_identity_integrity_error()
     repository.get_by_id.return_value = card
-    repository.exists_by_category_and_title.return_value = False
+    repository.exists_by_source_category_and_title.return_value = False
     repository.update.side_effect = integrity_error
     data = KnowledgeCardUpdate(title="Race duplicate")
 

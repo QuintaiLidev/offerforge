@@ -18,6 +18,7 @@ def build_knowledge_card(
     *,
     title: str = "Explain Python list and tuple differences",
     category: KnowledgeCategory = KnowledgeCategory.PYTHON,
+    source_reference: str | None = None,
 ) -> KnowledgeCard:
     return KnowledgeCard(
         title=title,
@@ -25,6 +26,7 @@ def build_knowledge_card(
         core_knowledge="Python sequence types and mutability.",
         question="Explain the difference between list and tuple.",
         reference_answer="A list is mutable; a tuple is immutable.",
+        source_reference=source_reference,
     )
 
 
@@ -82,13 +84,21 @@ def test_practice_attempt_can_be_created_and_read_through_relationship(
     assert card.practice_attempts == [attempt]
 
 
-def test_knowledge_card_title_is_unique_within_category_only(
+def test_knowledge_card_title_is_unique_within_source_and_category(
     db_session: Session,
 ) -> None:
     db_session.add_all(
         [
-            build_knowledge_card(title="JOIN basics", category=KnowledgeCategory.SQL),
-            build_knowledge_card(title="JOIN basics", category=KnowledgeCategory.SQL),
+            build_knowledge_card(
+                title="JOIN basics",
+                category=KnowledgeCategory.SQL,
+                source_reference="interview-week1-v3",
+            ),
+            build_knowledge_card(
+                title="JOIN basics",
+                category=KnowledgeCategory.SQL,
+                source_reference="interview-week1-v3",
+            ),
         ]
     )
 
@@ -101,17 +111,27 @@ def test_knowledge_card_title_is_unique_within_category_only(
 
     db_session.add_all(
         [
-            build_knowledge_card(title="JOIN basics", category=KnowledgeCategory.SQL),
+            build_knowledge_card(
+                title="JOIN basics",
+                category=KnowledgeCategory.SQL,
+                source_reference="interview-week1-v3",
+            ),
+            build_knowledge_card(
+                title="JOIN basics",
+                category=KnowledgeCategory.SQL,
+                source_reference="interview-week1-v4",
+            ),
             build_knowledge_card(
                 title="JOIN basics",
                 category=KnowledgeCategory.PROJECT_EXPLANATION,
+                source_reference="interview-week1-v3",
             ),
         ]
     )
     db_session.commit()
 
     card_count = db_session.scalar(select(func.count()).select_from(KnowledgeCard))
-    assert card_count == 2
+    assert card_count == 3
 
 
 def test_database_cascade_deletes_attempts_when_card_is_deleted(

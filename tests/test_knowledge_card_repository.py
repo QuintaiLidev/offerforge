@@ -70,26 +70,43 @@ def test_get_by_id_returns_card_or_none(db_session: Session) -> None:
     assert repository.get_by_id(999_999) is None
 
 
-def test_get_by_category_and_title_uses_exact_category_and_title(
+def test_get_by_source_category_and_title_uses_exact_source_category_and_title(
     db_session: Session,
 ) -> None:
     repository = make_repository(db_session)
     python_card = repository.create(
-        make_card_create(title="JOIN basics", category=KnowledgeCategory.PYTHON)
+        make_card_create(
+            title="JOIN basics",
+            category=KnowledgeCategory.PYTHON,
+            source_reference="interview-week1-v3",
+        )
     )
     repository.create(
-        make_card_create(title="JOIN basics", category=KnowledgeCategory.SQL)
+        make_card_create(
+            title="JOIN basics",
+            category=KnowledgeCategory.PYTHON,
+            source_reference="interview-week1-v4",
+        )
+    )
+    repository.create(
+        make_card_create(
+            title="JOIN basics",
+            category=KnowledgeCategory.SQL,
+            source_reference="interview-week1-v3",
+        )
     )
 
-    found = repository.get_by_category_and_title(
+    found = repository.get_by_source_category_and_title(
+        "interview-week1-v3",
         KnowledgeCategory.PYTHON,
         "JOIN basics",
     )
 
     assert found == python_card
     assert (
-        repository.get_by_category_and_title(
-            KnowledgeCategory.HR_INTERVIEW,
+        repository.get_by_source_category_and_title(
+            "interview-week1-v5",
+            KnowledgeCategory.PYTHON,
             "JOIN basics",
         )
         is None
@@ -342,47 +359,86 @@ def test_create_unique_constraint_failure_rolls_back_session(
 ) -> None:
     repository = make_repository(db_session)
     repository.create(
-        make_card_create(title="Duplicate title", category=KnowledgeCategory.PYTHON)
+        make_card_create(
+            title="Duplicate title",
+            category=KnowledgeCategory.PYTHON,
+            source_reference="interview-week1-v3",
+        )
+    )
+    cross_source_card = repository.create(
+        make_card_create(
+            title="Duplicate title",
+            category=KnowledgeCategory.PYTHON,
+            source_reference="interview-week1-v4",
+        )
     )
 
     with pytest.raises(IntegrityError):
         repository.create(
-            make_card_create(title="Duplicate title", category=KnowledgeCategory.PYTHON)
+            make_card_create(
+                title="Duplicate title",
+                category=KnowledgeCategory.PYTHON,
+                source_reference="interview-week1-v3",
+            )
         )
 
     valid_card = repository.create(
         make_card_create(title="Valid after rollback", category=KnowledgeCategory.PYTHON)
     )
 
+    assert cross_source_card.id is not None
     assert valid_card.id is not None
     assert repository.get_by_id(valid_card.id) == valid_card
 
 
-def test_exists_by_category_and_title_supports_excluding_current_card(
+def test_exists_by_source_category_and_title_supports_excluding_current_card(
     db_session: Session,
 ) -> None:
     repository = make_repository(db_session)
     current = repository.create(
-        make_card_create(title="Same title", category=KnowledgeCategory.SQL)
+        make_card_create(
+            title="Same title",
+            category=KnowledgeCategory.SQL,
+            source_reference="interview-week1-v3",
+        )
     )
     other = repository.create(
-        make_card_create(title="Existing SQL title", category=KnowledgeCategory.SQL)
+        make_card_create(
+            title="Existing SQL title",
+            category=KnowledgeCategory.SQL,
+            source_reference="interview-week1-v3",
+        )
+    )
+    repository.create(
+        make_card_create(
+            title="Same title",
+            category=KnowledgeCategory.SQL,
+            source_reference="interview-week1-v4",
+        )
     )
 
-    assert repository.exists_by_category_and_title(
+    assert repository.exists_by_source_category_and_title(
+        "interview-week1-v3",
         KnowledgeCategory.SQL,
         "Same title",
     )
-    assert not repository.exists_by_category_and_title(
+    assert not repository.exists_by_source_category_and_title(
+        "interview-week1-v3",
         KnowledgeCategory.SQL,
         "Same title",
         exclude_id=current.id,
     )
 
-    assert repository.exists_by_category_and_title(
+    assert repository.exists_by_source_category_and_title(
+        "interview-week1-v3",
         KnowledgeCategory.SQL,
         other.title,
         exclude_id=current.id,
+    )
+    assert not repository.exists_by_source_category_and_title(
+        "interview-week1-v5",
+        KnowledgeCategory.SQL,
+        "Same title",
     )
 
 

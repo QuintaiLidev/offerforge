@@ -25,12 +25,18 @@ from app.services.exceptions import (
 )
 
 
-def _is_category_title_unique_constraint_error(exc: IntegrityError) -> bool:
+def _is_card_identity_unique_constraint_error(exc: IntegrityError) -> bool:
     message = str(exc.orig) if exc.orig is not None else str(exc)
-    return (
+    source_aware_constraint = (
+        "UNIQUE constraint failed: "
+        "knowledge_cards.source_reference, knowledge_cards.category, "
+        "knowledge_cards.title"
+    )
+    legacy_constraint = (
         "UNIQUE constraint failed: "
         "knowledge_cards.category, knowledge_cards.title"
-    ) in message
+    )
+    return source_aware_constraint in message or legacy_constraint in message
 
 
 class KnowledgeCardService:
@@ -43,21 +49,55 @@ class KnowledgeCardService:
         self.attempt_repository = attempt_repository
 
     def create_card(self, data: KnowledgeCardCreate) -> KnowledgeCard:
-        if self.repository.exists_by_category_and_title(data.category, data.title):
-            raise DuplicateKnowledgeCardError(data.category, data.title)
-
-        try:
-            return self.repository.create(data)
-        except IntegrityError as exc:
-            if _is_category_title_unique_constraint_error(exc):
-                raise DuplicateKnowledgeCardError(data.category, data.title) from exc
-            raise
+        self._ensure_unique_card_identity(data)
+        return self._create_card_without_precheck(data)
 
     def create_cards(
         self,
         items: list[KnowledgeCardCreate],
     ) -> list[KnowledgeCard]:
-        return [self.create_card(item) for item in items]
+        seen_identities: set[
+            tuple[str | None, KnowledgeCategory, str]
+        ] = set()
+        for item in items:
+            identity = (item.source_reference, item.category, item.title)
+            if identity in seen_identities:
+                raise DuplicateKnowledgeCardError(
+                    item.category,
+                    item.title,
+                    item.source_reference,
+                )
+            seen_identities.add(identity)
+            self._ensure_unique_card_identity(item)
+
+        return [self._create_card_without_precheck(item) for item in items]
+
+    def _ensure_unique_card_identity(self, data: KnowledgeCardCreate) -> None:
+        if self.repository.exists_by_source_category_and_title(
+            data.source_reference,
+            data.category,
+            data.title,
+        ):
+            raise DuplicateKnowledgeCardError(
+                data.category,
+                data.title,
+                data.source_reference,
+            )
+
+    def _create_card_without_precheck(
+        self,
+        data: KnowledgeCardCreate,
+    ) -> KnowledgeCard:
+        try:
+            return self.repository.create(data)
+        except IntegrityError as exc:
+            if _is_card_identity_unique_constraint_error(exc):
+                raise DuplicateKnowledgeCardError(
+                    data.category,
+                    data.title,
+                    data.source_reference,
+                ) from exc
+            raise
 
     def get_card(self, card_id: int) -> KnowledgeCard:
         card = self.repository.get_by_id(card_id)
@@ -156,25 +196,42 @@ class KnowledgeCardService:
     ) -> KnowledgeCard:
         card = self.get_card(card_id)
         updated_fields = data.model_dump(exclude_unset=True)
-        changes_identity = "category" in updated_fields or "title" in updated_fields
+        changes_identity = any(
+            field_name in updated_fields
+            for field_name in ("source_reference", "category", "title")
+        )
 
+        final_source_reference = (
+            data.source_reference
+            if "source_reference" in updated_fields
+            else card.source_reference
+        )
         final_category = (
             data.category if "category" in updated_fields else card.category
         )
         final_title = data.title if "title" in updated_fields else card.title
 
-        if changes_identity and self.repository.exists_by_category_and_title(
+        if changes_identity and self.repository.exists_by_source_category_and_title(
+            final_source_reference,
             final_category,
             final_title,
             exclude_id=card.id,
         ):
-            raise DuplicateKnowledgeCardError(final_category, final_title)
+            raise DuplicateKnowledgeCardError(
+                final_category,
+                final_title,
+                final_source_reference,
+            )
 
         try:
             return self.repository.update(card, data)
         except IntegrityError as exc:
-            if _is_category_title_unique_constraint_error(exc):
-                raise DuplicateKnowledgeCardError(final_category, final_title) from exc
+            if _is_card_identity_unique_constraint_error(exc):
+                raise DuplicateKnowledgeCardError(
+                    final_category,
+                    final_title,
+                    final_source_reference,
+                ) from exc
             raise
 
     def delete_card(self, card_id: int) -> None:

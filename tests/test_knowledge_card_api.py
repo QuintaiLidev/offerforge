@@ -238,6 +238,52 @@ async def test_post_duplicate_same_category_returns_409(
     assert "already exists in category 'python'" in response.json()["detail"]
 
 
+async def test_post_allows_same_title_category_across_source_references(
+    client: httpx.AsyncClient,
+) -> None:
+    title = "Java 多线程有哪几种实现方式？"
+    first = await create_card(
+        client,
+        title=title,
+        category="real_business_case",
+        source_reference="interview-week1-v3",
+    )
+    second = await create_card(
+        client,
+        title=title,
+        category="real_business_case",
+        source_reference="interview-week1-v4",
+    )
+
+    assert first["id"] != second["id"]
+    assert first["source_reference"] == "interview-week1-v3"
+    assert second["source_reference"] == "interview-week1-v4"
+
+
+async def test_post_duplicate_same_source_returns_409(
+    client: httpx.AsyncClient,
+) -> None:
+    title = "Java 多线程有哪几种实现方式？"
+    await create_card(
+        client,
+        title=title,
+        category="real_business_case",
+        source_reference="interview-week1-v3",
+    )
+
+    response = await client.post(
+        "/api/v1/cards",
+        json=card_payload(
+            title=title,
+            category="real_business_case",
+            source_reference="interview-week1-v3",
+        ),
+    )
+
+    assert response.status_code == 409
+    assert "source_reference 'interview-week1-v3'" in response.json()["detail"]
+
+
 async def test_post_same_title_different_category_is_allowed(
     client: httpx.AsyncClient,
 ) -> None:
@@ -246,6 +292,68 @@ async def test_post_same_title_different_category_is_allowed(
 
     assert first["id"] != second["id"]
     assert second["category"] == "sql"
+
+
+async def test_post_bulk_allows_v4_when_v3_has_same_title_category(
+    client: httpx.AsyncClient,
+) -> None:
+    title = "Java 多线程有哪几种实现方式？"
+    await create_card(
+        client,
+        title=title,
+        category="real_business_case",
+        source_reference="interview-week1-v3",
+    )
+
+    response = await client.post(
+        "/api/v1/cards/bulk",
+        json=[
+            card_payload(
+                title=title,
+                category="real_business_case",
+                source_reference="interview-week1-v4",
+            ),
+            card_payload(
+                title="Java 多线程题，测试开发岗位需要答到什么深度？",
+                category="real_business_case",
+                source_reference="interview-week1-v4",
+            ),
+        ],
+    )
+    sources = await client.get("/api/v1/cards/sources")
+    summaries = {
+        item["source_reference"]: item
+        for item in sources.json()["items"]
+    }
+
+    assert response.status_code == 201
+    assert response.json()["created_count"] == 2
+    assert summaries["interview-week1-v3"]["total_count"] == 1
+    assert summaries["interview-week1-v4"]["total_count"] == 2
+
+
+async def test_post_bulk_duplicate_same_source_returns_409(
+    client: httpx.AsyncClient,
+    db_session: Session,
+) -> None:
+    response = await client.post(
+        "/api/v1/cards/bulk",
+        json=[
+            card_payload(
+                title="Bulk duplicate same source",
+                source_reference="interview-week1-v4",
+            ),
+            card_payload(
+                title="Bulk duplicate same source",
+                source_reference="interview-week1-v4",
+            ),
+        ],
+    )
+    count = db_session.scalar(select(func.count()).select_from(KnowledgeCard))
+
+    assert response.status_code == 409
+    assert "source_reference 'interview-week1-v4'" in response.json()["detail"]
+    assert count == 0
 
 
 @pytest.mark.parametrize(

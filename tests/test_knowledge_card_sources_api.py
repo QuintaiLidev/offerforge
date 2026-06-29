@@ -226,7 +226,7 @@ async def test_delete_source_removes_existing_source_cards(
     create_card(db_session, title="Bad v4 two", source_reference="interview-week1-v4")
     v3_card = create_card(
         db_session,
-        title="V3 remains",
+        title="Bad v4 one",
         source_reference="interview-week1-v3",
     )
 
@@ -313,13 +313,12 @@ async def test_today_reviews_exclude_inactive_source_but_keep_active_v4(
 ) -> None:
     v3_card = create_card(
         db_session,
-        title="V3 new card",
+        title="Shared source question",
         source_reference="interview-week1-v3",
     )
     v4_card = create_card(
         db_session,
-        title="V4 new card",
-        category=KnowledgeCategory.SQL,
+        title="Shared source question",
         source_reference="interview-week1-v4",
     )
     monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)

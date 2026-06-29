@@ -31,10 +31,24 @@ class KnowledgeCardSourceHasAttemptsError(ServiceError):
 
 
 class DuplicateKnowledgeCardError(ServiceError):
-    def __init__(self, category: KnowledgeCategory, title: str) -> None:
+    def __init__(
+        self,
+        category: KnowledgeCategory,
+        title: str,
+        source_reference: str | None = None,
+    ) -> None:
         self.category = category
         self.title = title
-        super().__init__(
-            "A knowledge card titled "
-            f"'{title}' already exists in category '{category.value}'."
-        )
+        self.source_reference = source_reference
+        if source_reference is None:
+            message = (
+                "A knowledge card titled "
+                f"'{title}' already exists in category '{category.value}'."
+            )
+        else:
+            message = (
+                "A knowledge card titled "
+                f"'{title}' already exists in source_reference "
+                f"'{source_reference}' and category '{category.value}'."
+            )
+        super().__init__(message)

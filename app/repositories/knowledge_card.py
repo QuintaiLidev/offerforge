@@ -16,6 +16,12 @@ from app.models.enums import (
 from app.schemas.knowledge_card import KnowledgeCardCreate, KnowledgeCardUpdate
 
 
+def _source_reference_filter(source_reference: str | None) -> object:
+    if source_reference is None:
+        return KnowledgeCard.source_reference.is_(None)
+    return KnowledgeCard.source_reference == source_reference
+
+
 class KnowledgeCardRepository:
     """Persistence operations for knowledge cards.
 
@@ -43,12 +49,14 @@ class KnowledgeCardRepository:
     def get_by_id(self, card_id: int) -> KnowledgeCard | None:
         return self.session.get(KnowledgeCard, card_id)
 
-    def get_by_category_and_title(
+    def get_by_source_category_and_title(
         self,
+        source_reference: str | None,
         category: KnowledgeCategory,
         title: str,
     ) -> KnowledgeCard | None:
         statement = select(KnowledgeCard).where(
+            _source_reference_filter(source_reference),
             KnowledgeCard.category == category,
             KnowledgeCard.title == title,
         )
@@ -258,14 +266,16 @@ class KnowledgeCardRepository:
             self.session.rollback()
             raise
 
-    def exists_by_category_and_title(
+    def exists_by_source_category_and_title(
         self,
+        source_reference: str | None,
         category: KnowledgeCategory,
         title: str,
         *,
         exclude_id: int | None = None,
     ) -> bool:
         filters = [
+            _source_reference_filter(source_reference),
             KnowledgeCard.category == category,
             KnowledgeCard.title == title,
         ]
