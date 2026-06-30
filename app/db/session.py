@@ -18,6 +18,9 @@ def build_engine_options(database_url: str) -> dict[str, Any]:
     options: dict[str, Any] = {"future": True}
     if is_sqlite_database_url(database_url):
         options["connect_args"] = {"check_same_thread": False}
+    else:
+        options["pool_pre_ping"] = True
+        options["pool_recycle"] = 1800
     return options
 
 

@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.main import app, create_app
-from app.models import KnowledgeCard
-from app.models.enums import KnowledgeCategory, MasteryLevel
+from app.models import KnowledgeCard, PracticeAttempt
+from app.models.enums import KnowledgeCategory, MasteryLevel, PracticeRating
 from app.repositories import KnowledgeCardRepository
 from app.schemas.knowledge_card import KnowledgeCardCreate
 
@@ -79,6 +79,28 @@ def item_categories(data: dict[str, Any]) -> list[str]:
     return [item["category"] for item in data["items"]]
 
 
+def create_attempt(
+    db_session: Session,
+    *,
+    card_id: int,
+    created_at: datetime,
+) -> PracticeAttempt:
+    attempt = PracticeAttempt(
+        knowledge_card_id=card_id,
+        rating=PracticeRating.CORRECT_EXPLAIN,
+        is_correct=True,
+        used_hint=False,
+        user_answer="Practiced answer",
+        elapsed_seconds=30,
+        scheduled_next_review_at=created_at + timedelta(days=4),
+        created_at=created_at,
+    )
+    db_session.add(attempt)
+    db_session.commit()
+    db_session.refresh(attempt)
+    return attempt
+
+
 async def test_today_returns_due_cards_when_available(
     client: httpx.AsyncClient,
     db_session: Session,
@@ -100,7 +122,8 @@ async def test_today_returns_due_cards_when_available(
     assert data["mode"] == "due"
     assert data["limit"] == 10
     assert data["total"] == 2
-    assert item_ids(data) == [due_card.id, new_card.id]
+    assert set(item_ids(data)) == {due_card.id, new_card.id}
+    assert item_ids(data).index(due_card.id) < item_ids(data).index(new_card.id)
     assert data["generated_at"] == FIXED_NOW.isoformat()
 
 
@@ -273,9 +296,9 @@ async def test_today_due_cards_are_followed_by_new_cards_when_due_is_short(
     data = response.json()
     ids = item_ids(data)
     assert data["mode"] == "due"
-    assert set(ids[:3]) == {card.id for card in due_cards}
-    assert set(ids[3:]) <= {card.id for card in new_cards}
-    assert len(ids[3:]) == 3
+    assert {card.id for card in due_cards} <= set(ids)
+    assert len(set(ids) & {card.id for card in new_cards}) == 3
+    assert len(ids) == 6
 
 
 async def test_today_balances_categories_and_is_stable_within_day(
@@ -313,6 +336,51 @@ async def test_today_balances_categories_and_is_stable_within_day(
     assert item_ids(first_data) != created_ids[:10]
     assert len(set(item_categories(first_data))) == len(categories)
     assert len(first_data["items"]) == 10
+
+
+async def test_today_prioritizes_categories_practiced_less_today(
+    client: httpx.AsyncClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sql_cards = [
+        create_card(
+            db_session,
+            title=f"SQL practiced {index}",
+            category=KnowledgeCategory.SQL,
+            mastery_level=MasteryLevel.LEARNING,
+            next_review_at=FIXED_NOW - timedelta(hours=2),
+        )
+        for index in range(3)
+    ]
+    hr_card = create_card(
+        db_session,
+        title="HR less practiced",
+        category=KnowledgeCategory.HR_INTERVIEW,
+        mastery_level=MasteryLevel.LEARNING,
+        next_review_at=FIXED_NOW - timedelta(hours=1),
+    )
+    python_card = create_card(
+        db_session,
+        title="Python less practiced",
+        category=KnowledgeCategory.PYTHON,
+        mastery_level=MasteryLevel.LEARNING,
+        next_review_at=FIXED_NOW,
+    )
+    for index in range(3):
+        create_attempt(
+            db_session,
+            card_id=sql_cards[index % len(sql_cards)].id,
+            created_at=FIXED_NOW - timedelta(minutes=index + 1),
+        )
+    monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
+
+    response = await client.get("/api/v1/reviews/today", params={"limit": 5})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["items"][0]["category"] != "sql"
+    assert {hr_card.id, python_card.id} <= set(item_ids(data))
 
 
 async def test_today_single_category_returns_all_candidates_when_under_limit(

@@ -78,6 +78,10 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "/api/v1/cards/${card.id}" in response.text
     assert 'method: "PATCH"' in response.text
     assert "/api/v1/practice-attempts" in response.text
+    assert "request failed" in response.text
+    assert "setButtonsDisabled(true, rating)" in response.text
+    assert "dataset.originalText" in response.text
+    assert "state.submitting" in response.text
     assert "loadHistory()" in response.text
     assert "Promise.all([loadToday(), loadDoneToday(), loadHistory()])" in response.text
     assert "answer_text" in response.text

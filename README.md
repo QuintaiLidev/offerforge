@@ -149,6 +149,8 @@ data/offerforge.db
 
 By default OfferForge uses local SQLite at `data/offerforge.db`. For an external database, set `OFFERFORGE_DATABASE_URL` or `DATABASE_URL`; priority is `OFFERFORGE_DATABASE_URL` > `DATABASE_URL` > local SQLite. PostgreSQL URLs such as `postgresql://...` are supported for hosted databases such as Neon. Do not commit real database URLs, usernames, passwords, or `.env` files.
 
+External database connections use SQLAlchemy pool pre-ping to reduce stale idle connection failures after cloud database sleep or redeploy cycles.
+
 ## Deployment
 
 本项目支持本地运行和私人云端部署。云端部署前必须配置 Basic Auth，并把 SQLite 数据库放到持久化磁盘或 volume。
@@ -208,7 +210,9 @@ Card editing: `/app` supports editing card title, question, core knowledge, refe
 
 ## Balanced review queue
 
-`GET /api/v1/reviews/today` balances returned cards across categories where possible. It uses a deterministic daily shuffle inside each category, so refreshing on the same day keeps the queue stable while the next day can reshuffle. Due cards still take priority, new cards only fill remaining slots, and scheduling intervals remain owned by the five-rating rules.
+`GET /api/v1/reviews/today` balances returned cards across categories where possible. It uses a deterministic daily category order, so refreshing on the same day keeps the queue stable while the next day can reshuffle. Due cards still take priority, new cards only fill remaining slots, and scheduling intervals remain owned by the five-rating rules.
+
+The `/app` review queue also considers categories practiced earlier today, so heavily practiced categories are pushed back when other eligible categories remain.
 
 ## Scheduling rules
 

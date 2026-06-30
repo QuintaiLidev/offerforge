@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 import hashlib
 
@@ -31,6 +31,8 @@ def balance_cards_by_category(
     *,
     limit: int,
     today: date | None = None,
+    practiced_category_counts: dict[str, int] | None = None,
+    recent_practiced_categories: list[str] | None = None,
 ) -> list[KnowledgeCard]:
     if limit <= 0 or not cards:
         return []
@@ -40,37 +42,39 @@ def balance_cards_by_category(
     for card in cards:
         grouped_cards[_category_value(card)].append(card)
 
-    categories = sorted(
-        grouped_cards,
-        key=lambda category: daily_shuffle_key(review_date, "category", category),
-    )
     buckets = {
-        category: sorted(
-            category_cards,
-            key=lambda card: (
-                daily_shuffle_key(
-                    review_date,
-                    f"card:{category}",
-                    str(card.id),
-                ),
-                card.id,
-            ),
-        )
+        category: list(category_cards)
         for category, category_cards in grouped_cards.items()
     }
+    practiced_counts = Counter(practiced_category_counts or {})
+    recent_categories = list(recent_practiced_categories or [])
+
+    def category_priority(category: str) -> tuple[int, int, int, str]:
+        hard_recent_penalty = int(
+            len(recent_categories) >= 2
+            and recent_categories[0] == recent_categories[1] == category
+        )
+        soft_recent_penalty = int(
+            bool(recent_categories) and recent_categories[0] == category
+        )
+        return (
+            hard_recent_penalty,
+            practiced_counts[category],
+            soft_recent_penalty,
+            daily_shuffle_key(review_date, "category", category),
+        )
 
     balanced_cards: list[KnowledgeCard] = []
     while len(balanced_cards) < limit:
-        added_in_round = False
-        for category in categories:
-            if not buckets[category]:
-                continue
-            balanced_cards.append(buckets[category].pop(0))
-            added_in_round = True
-            if len(balanced_cards) >= limit:
-                break
-        if not added_in_round:
+        available_categories = [
+            category for category, category_cards in buckets.items() if category_cards
+        ]
+        if not available_categories:
             break
+        category = min(available_categories, key=category_priority)
+        balanced_cards.append(buckets[category].pop(0))
+        practiced_counts[category] += 1
+        recent_categories = [category, *recent_categories[:1]]
 
     return balanced_cards
 
@@ -90,6 +94,8 @@ class ReviewService:
 
         generated_at = utc_now()
         review_date = generated_at.date()
+        practiced_categories = self._list_practiced_categories_for_today(generated_at)
+        practiced_category_counts = dict(Counter(practiced_categories))
         due_cards, due_total = self._list_due_candidates(
             generated_at=generated_at,
             requested_limit=limit,
@@ -98,6 +104,8 @@ class ReviewService:
             due_cards,
             limit=limit,
             today=review_date,
+            practiced_category_counts=practiced_category_counts,
+            recent_practiced_categories=practiced_categories,
         )
         if len(balanced_due_cards) >= limit:
             return ReviewTodayResponse(
@@ -110,12 +118,13 @@ class ReviewService:
 
         remaining_limit = limit - len(balanced_due_cards)
         new_cards, new_total = self._list_new_candidates(requested_limit=remaining_limit)
-        balanced_new_cards = balance_cards_by_category(
-            new_cards,
-            limit=remaining_limit,
+        items = balance_cards_by_category(
+            [*balanced_due_cards, *new_cards],
+            limit=limit,
             today=review_date,
+            practiced_category_counts=practiced_category_counts,
+            recent_practiced_categories=practiced_categories,
         )
-        items = [*balanced_due_cards, *balanced_new_cards]
 
         return ReviewTodayResponse(
             mode="due" if due_total else "new",
@@ -141,6 +150,17 @@ class ReviewService:
                 limit=total,
             )
         return cards, total
+
+    def _list_practiced_categories_for_today(
+        self,
+        generated_at: datetime,
+    ) -> list[str]:
+        start_at = generated_at.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_at = start_at + timedelta(days=1)
+        return self.attempt_repository.list_practiced_categories_for_period(
+            start_at=start_at,
+            end_at=end_at,
+        )
 
     def _list_new_candidates(
         self,

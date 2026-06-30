@@ -29,8 +29,15 @@ def make_card_create(
     return KnowledgeCardCreate(**payload)
 
 
-def create_card(db_session: Session, title: str = "Practice repository card") -> int:
-    card = KnowledgeCardRepository(db_session).create(make_card_create(title=title))
+def create_card(
+    db_session: Session,
+    title: str = "Practice repository card",
+    *,
+    category: KnowledgeCategory = KnowledgeCategory.PYTHON,
+) -> int:
+    card = KnowledgeCardRepository(db_session).create(
+        make_card_create(title=title, category=category)
+    )
     return card.id
 
 
@@ -122,6 +129,38 @@ def test_list_by_card_id_returns_empty_for_missing_card_id(
 
     assert items == []
     assert total == 0
+
+
+def test_list_practiced_categories_for_period_orders_recent_first(
+    db_session: Session,
+) -> None:
+    python_card_id = create_card(db_session, title="Python category")
+    sql_card_id = create_card(
+        db_session,
+        title="SQL category",
+        category=KnowledgeCategory.SQL,
+    )
+    repository = PracticeAttemptRepository(db_session)
+    older = repository.create(
+        make_attempt_create(card_id=python_card_id, rating=PracticeRating.TRANSFER)
+    )
+    newer = repository.create(
+        make_attempt_create(card_id=sql_card_id, rating=PracticeRating.DONT_KNOW)
+    )
+    outside = repository.create(
+        make_attempt_create(card_id=python_card_id, rating=PracticeRating.WITH_HINT)
+    )
+    older.created_at = datetime(2026, 6, 27, 9, 0, 0)
+    newer.created_at = datetime(2026, 6, 27, 11, 0, 0)
+    outside.created_at = datetime(2026, 6, 26, 23, 0, 0)
+    db_session.commit()
+
+    categories = repository.list_practiced_categories_for_period(
+        start_at=datetime(2026, 6, 27, 0, 0, 0),
+        end_at=datetime(2026, 6, 28, 0, 0, 0),
+    )
+
+    assert categories == ["sql", "python"]
 
 
 @pytest.mark.parametrize(

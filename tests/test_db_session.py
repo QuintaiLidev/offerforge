@@ -17,7 +17,10 @@ def test_postgresql_engine_options_do_not_include_sqlite_connect_args() -> None:
         "postgresql://user:pass@db.example.com/offerforge"
     )
 
-    assert options == {"future": True}
+    assert options["future"] is True
+    assert options["pool_pre_ping"] is True
+    assert options["pool_recycle"] == 1800
+    assert "connect_args" not in options
 
 
 def test_create_database_engine_passes_postgresql_url_without_sqlite_options(
@@ -41,4 +44,8 @@ def test_create_database_engine_passes_postgresql_url_without_sqlite_options(
     assert captured["database_url"] == (
         "postgresql://user:pass@db.example.com/offerforge"
     )
-    assert captured["kwargs"] == {"future": True}
+    assert captured["kwargs"] == {
+        "future": True,
+        "pool_pre_ping": True,
+        "pool_recycle": 1800,
+    }

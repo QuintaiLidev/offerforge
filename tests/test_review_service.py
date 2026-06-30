@@ -52,6 +52,16 @@ def item_ids(items: list[SimpleNamespace]) -> list[int]:
     return [item.id for item in items]
 
 
+def make_attempt_repository_mock(
+    practiced_categories: list[str] | None = None,
+) -> Mock:
+    attempt_repository = Mock()
+    attempt_repository.list_practiced_categories_for_period.return_value = (
+        practiced_categories or []
+    )
+    return attempt_repository
+
+
 def attempt_response(
     *,
     attempt_id: int,
@@ -190,6 +200,64 @@ def test_balance_cards_by_category_handles_single_category_and_short_candidates(
     assert {card.category for card in balanced} == {KnowledgeCategory.PYTHON}
 
 
+def test_balance_cards_by_category_prefers_less_practiced_categories() -> None:
+    cards = [
+        card_response(card_id=1, title="SQL 1", category=KnowledgeCategory.SQL),
+        card_response(card_id=2, title="SQL 2", category=KnowledgeCategory.SQL),
+        card_response(card_id=3, title="HR 1", category=KnowledgeCategory.HR_INTERVIEW),
+        card_response(card_id=4, title="Python 1"),
+    ]
+
+    balanced = balance_cards_by_category(
+        cards,
+        limit=4,
+        today=date(2026, 6, 27),
+        practiced_category_counts={"sql": 3},
+        recent_practiced_categories=["sql", "sql"],
+    )
+
+    assert balanced[0].category is not KnowledgeCategory.SQL
+    assert KnowledgeCategory.SQL in {card.category for card in balanced}
+
+
+def test_balance_cards_by_category_avoids_more_than_two_repeats_when_possible() -> None:
+    cards = [
+        *[
+            card_response(
+                card_id=index,
+                title=f"SQL {index}",
+                category=KnowledgeCategory.SQL,
+            )
+            for index in range(1, 6)
+        ],
+        card_response(card_id=6, title="Python 1"),
+        card_response(card_id=7, title="Python 2"),
+        card_response(
+            card_id=8,
+            title="HR 1",
+            category=KnowledgeCategory.HR_INTERVIEW,
+        ),
+    ]
+
+    balanced = balance_cards_by_category(
+        cards,
+        limit=8,
+        today=date(2026, 6, 27),
+        recent_practiced_categories=["sql", "sql"],
+    )
+    categories = [card.category for card in balanced]
+
+    assert all(
+        not (
+            categories[index]
+            == categories[index + 1]
+            == categories[index + 2]
+            and len(set(categories[index:])) > 1
+        )
+        for index in range(len(categories) - 2)
+    )
+
+
 def test_get_today_reviews_returns_only_due_cards_when_due_reaches_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -206,7 +274,8 @@ def test_get_today_reviews_returns_only_due_cards_when_due_reaches_limit(
         for index in range(1, 9)
     ]
     repository.list_due_for_review.return_value = (due_cards, len(due_cards))
-    service = ReviewService(repository, Mock())
+    attempt_repository = make_attempt_repository_mock()
+    service = ReviewService(repository, attempt_repository)
     monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
 
     response = service.get_today_reviews(limit=5)
@@ -219,6 +288,7 @@ def test_get_today_reviews_returns_only_due_cards_when_due_reaches_limit(
     assert response.generated_at == FIXED_NOW
     repository.list_due_for_review.assert_called_once_with(FIXED_NOW, limit=5)
     repository.list_new_for_review.assert_not_called()
+    attempt_repository.list_practiced_categories_for_period.assert_called_once()
 
 
 def test_get_today_reviews_keeps_due_before_new_when_due_is_short(
@@ -260,15 +330,15 @@ def test_get_today_reviews_keeps_due_before_new_when_due_is_short(
     ]
     repository.list_due_for_review.return_value = (due_cards, len(due_cards))
     repository.list_new_for_review.return_value = (new_cards, len(new_cards))
-    service = ReviewService(repository, Mock())
+    service = ReviewService(repository, make_attempt_repository_mock())
     monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
 
     response = service.get_today_reviews(limit=6)
 
     returned_ids = item_ids(response.items)
     assert response.mode == "due"
-    assert set(returned_ids[:3]) == {1, 2, 3}
-    assert set(returned_ids[3:]) == {4, 5, 6}
+    assert {1, 2, 3} <= set(returned_ids)
+    assert set(returned_ids) == {1, 2, 3, 4, 5, 6}
     assert response.total == 6
     repository.list_due_for_review.assert_called_once_with(FIXED_NOW, limit=6)
     repository.list_new_for_review.assert_called_once_with(limit=3)
@@ -281,7 +351,7 @@ def test_get_today_reviews_returns_new_cards_when_no_due(
     new_card = card_response(card_id=2, title="New card")
     repository.list_due_for_review.return_value = ([], 0)
     repository.list_new_for_review.return_value = ([new_card], 1)
-    service = ReviewService(repository, Mock())
+    service = ReviewService(repository, make_attempt_repository_mock())
     monkeypatch.setattr("app.services.review.utc_now", lambda: FIXED_NOW)
 
     response = service.get_today_reviews(limit=5)
@@ -297,10 +367,34 @@ def test_get_today_reviews_returns_new_cards_when_no_due(
 
 @pytest.mark.parametrize("limit", [0, 51])
 def test_get_today_reviews_rejects_invalid_limit(limit: int) -> None:
-    service = ReviewService(Mock(), Mock())
-
     with pytest.raises(ValueError, match="limit must be between 1 and 50"):
+        service = ReviewService(Mock(), make_attempt_repository_mock())
         service.get_today_reviews(limit=limit)
+
+
+def test_get_today_reviews_prioritizes_less_practiced_categories() -> None:
+    repository = Mock()
+    due_cards = [
+        card_response(card_id=1, title="SQL 1", category=KnowledgeCategory.SQL),
+        card_response(card_id=2, title="SQL 2", category=KnowledgeCategory.SQL),
+        card_response(card_id=3, title="SQL 3", category=KnowledgeCategory.SQL),
+        card_response(
+            card_id=4,
+            title="HR interview",
+            category=KnowledgeCategory.HR_INTERVIEW,
+        ),
+        card_response(card_id=5, title="Python interview"),
+    ]
+    repository.list_due_for_review.return_value = (due_cards, len(due_cards))
+    attempt_repository = make_attempt_repository_mock(
+        practiced_categories=["sql", "sql", "sql"]
+    )
+    service = ReviewService(repository, attempt_repository)
+
+    response = service.get_today_reviews(limit=5)
+
+    assert response.items[0].category is not KnowledgeCategory.SQL
+    assert {item.id for item in response.items} == {1, 2, 3, 4, 5}
 
 
 def test_get_practice_history_returns_recent_attempts_with_cards() -> None:

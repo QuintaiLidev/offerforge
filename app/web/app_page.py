@@ -716,10 +716,17 @@ APP_HTML = """<!doctype html>
       elements.loadingText.textContent = isLoading ? "加载中..." : "";
     }
 
-    function setButtonsDisabled(disabled) {
+    function setButtonsDisabled(disabled, activeRating = null) {
       elements.showAnswerButton.disabled = disabled;
       elements.ratingButtons.forEach((button) => {
+        if (!button.dataset.originalText) {
+          button.dataset.originalText = button.textContent;
+        }
         button.disabled = disabled;
+        button.textContent =
+          disabled && activeRating === button.dataset.rating
+            ? "提交中..."
+            : button.dataset.originalText;
       });
     }
 
@@ -728,11 +735,18 @@ APP_HTML = """<!doctype html>
         Accept: "application/json",
         ...(options.headers || {}),
       };
-      const response = await fetch(url, {
-        ...options,
-        headers,
-        credentials: "same-origin",
-      });
+      const method = options.method || "GET";
+      let response;
+      try {
+        response = await fetch(url, {
+          ...options,
+          headers,
+          credentials: "same-origin",
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        throw new Error(`${method} ${url} request failed: ${detail}`);
+      }
       if (!response.ok) {
         let message = `${response.status} ${response.statusText}`;
         try {
@@ -1117,7 +1131,7 @@ APP_HTML = """<!doctype html>
       clearError();
       clearSuccess();
       state.submitting = true;
-      setButtonsDisabled(true);
+      setButtonsDisabled(true, rating);
 
       const answerText = elements.answerInput.value.trim();
       const elapsedSeconds = Math.max(

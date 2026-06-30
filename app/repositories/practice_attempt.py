@@ -79,6 +79,29 @@ class PracticeAttemptRepository:
         )
         return self.session.scalar(statement) or 0
 
+    def list_practiced_categories_for_period(
+        self,
+        *,
+        start_at: datetime,
+        end_at: datetime,
+    ) -> list[str]:
+        statement = (
+            select(KnowledgeCard.category)
+            .join(
+                PracticeAttempt,
+                PracticeAttempt.knowledge_card_id == KnowledgeCard.id,
+            )
+            .where(
+                PracticeAttempt.created_at >= start_at,
+                PracticeAttempt.created_at < end_at,
+            )
+            .order_by(PracticeAttempt.created_at.desc(), PracticeAttempt.id.desc())
+        )
+        return [
+            category.value if hasattr(category, "value") else str(category)
+            for category in self.session.scalars(statement).all()
+        ]
+
     def list_recent_with_cards(
         self,
         *,
