@@ -205,6 +205,7 @@ Bulk card import is available through `POST /api/v1/cards/bulk` with a JSON arra
 `GET /api/v1/reviews/done-today` returns cards practiced during the current UTC day. The `/app` page shows today's practiced cards after submission so the question and reference answer can be reviewed again. This is a same-day review aid and does not change scheduling rules.
 
 Practice history: `/app` can show recent practice attempts, including rating, user answer, card information, and next review time.
+Answer Arena V0.1: `/app` supports rule-based answer scoring before submitting a practice rating.
 
 Card editing: `/app` supports editing card title, question, core knowledge, reference answer, and tags.
 
