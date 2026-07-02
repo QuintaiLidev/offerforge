@@ -50,6 +50,10 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "historyList" in response.text
     assert "展开历史" in response.text
     assert "我的回答" in response.text
+    assert "答题评分" in response.text
+    assert "scoreCurrentAnswer" in response.text
+    assert "/api/v1/answer-arena/score" in response.text
+    assert "renderScoreResult" in response.text
     assert "编辑卡片" in response.text
     assert "edit-card-button" in response.text
     assert "card-edit-form" in response.text
@@ -80,6 +84,7 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "/api/v1/practice-attempts" in response.text
     assert "request failed" in response.text
     assert "setButtonsDisabled(true, rating)" in response.text
+    assert "scoreCurrentAnswer" in response.text
     assert "dataset.originalText" in response.text
     assert "state.submitting" in response.text
     assert "loadHistory()" in response.text

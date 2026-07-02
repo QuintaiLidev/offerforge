@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.repositories import KnowledgeCardRepository, PracticeAttemptRepository
 from app.services import KnowledgeCardService, PracticeAttemptService, ReviewService
+from app.services.answer_arena import AnswerArenaService
 
 
 def get_knowledge_card_service(
@@ -32,3 +33,10 @@ def get_review_service(
     card_repository = KnowledgeCardRepository(db)
     attempt_repository = PracticeAttemptRepository(db)
     return ReviewService(card_repository, attempt_repository)
+
+
+def get_answer_arena_service(
+    db: Annotated[Session, Depends(get_db)],
+) -> AnswerArenaService:
+    card_repository = KnowledgeCardRepository(db)
+    return AnswerArenaService(card_repository)

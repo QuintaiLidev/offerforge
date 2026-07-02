@@ -1,5 +1,10 @@
 """Pydantic schemas for OfferForge."""
 
+from app.schemas.answer_arena import (
+    ANSWER_SCORE_DIMENSIONS,
+    AnswerScoreRequest,
+    AnswerScoreResponse,
+)
 from app.schemas.knowledge_card import (
     KnowledgeCardBase,
     KnowledgeCardBulkCreateResponse,
@@ -25,6 +30,9 @@ from app.schemas.review import (
 )
 
 __all__ = [
+    "ANSWER_SCORE_DIMENSIONS",
+    "AnswerScoreRequest",
+    "AnswerScoreResponse",
     "KnowledgeCardBase",
     "KnowledgeCardBulkCreateResponse",
     "KnowledgeCardCreate",
