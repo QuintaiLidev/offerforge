@@ -205,6 +205,7 @@ Bulk card import is available through `POST /api/v1/cards/bulk` with a JSON arra
 `GET /api/v1/reviews/done-today` returns cards practiced during the current UTC day. The `/app` page shows today's practiced cards after submission so the question and reference answer can be reviewed again. This is a same-day review aid and does not change scheduling rules.
 
 Practice history: `/app` can show recent practice attempts, including rating, user answer, card information, and next review time.
+Answer Arena V0.1: `/app` supports rule-based answer scoring before submitting a practice rating.
 
 Card editing: `/app` supports editing card title, question, core knowledge, reference answer, and tags.
 
@@ -228,6 +229,8 @@ Week one interview seed cards are available at `data_seed/cards_seed_week1_inter
 The file contains 95 cards for interview replay, resume projects, debugging, UI automation, Python coding, SQL, Linux, and HR practice. It is designed for import through `POST /api/v1/cards/bulk` and does not contain sensitive information.
 
 `data_seed/cards_seed_week1_interview_v4.json` is an upgraded interview-practice seed with more oral reference answers, memory structure, and follow-up defense notes. The v3 seed remains available, and v4 does not automatically overwrite existing online cards. To use v4 online, import it later through bulk import or switch `OFFERFORGE_AUTO_SEED_PATH`, taking care not to mix old and new card sets unintentionally.
+
+`data_seed/cards_seed_smartmore_interview_v1.json` contains 15 SmartMore interview review cards focused on AI tool usage, UI automation, business testing, career direction, and role matching.
 
 ## Seed source management
 
