@@ -191,6 +191,7 @@ APP_HTML = """<!doctype html>
     }
 
     .answer-toggle,
+    .answer-score-button,
     .rating-button {
       width: 100%;
       min-height: 48px;
@@ -208,7 +209,43 @@ APP_HTML = """<!doctype html>
       color: var(--accent-strong);
     }
 
+    .answer-score-button {
+      margin-top: 10px;
+      background: #eef3ff;
+      color: #2451a6;
+    }
+
+    .score-result {
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid #cbd8ff;
+      border-radius: 8px;
+      background: #f7f9ff;
+      color: var(--text);
+    }
+
+    .score-result.visible {
+      display: block;
+    }
+
+    .score-result h3 {
+      margin: 0 0 8px;
+      font-size: 1.08rem;
+    }
+
+    .score-result ul {
+      margin: 6px 0 10px 20px;
+      padding: 0;
+    }
+
+    .score-risk {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
     .answer-toggle:disabled,
+    .answer-score-button:disabled,
     .rating-button:disabled {
       cursor: wait;
       opacity: 0.58;
@@ -531,8 +568,10 @@ APP_HTML = """<!doctype html>
           class="answer-input"
           name="answer_text"
           autocomplete="off"
-          placeholder="可选：记录你的回答"
+          placeholder="先写下或粘贴你的回答，再点击答题评分"
         ></textarea>
+        <button id="scoreAnswerButton" class="answer-score-button" type="button">答题评分</button>
+        <div id="scoreResult" class="score-result" aria-live="polite"></div>
       </div>
 
       <div class="section">
@@ -571,6 +610,7 @@ APP_HTML = """<!doctype html>
       currentCard: null,
       cardStartedAt: null,
       submitting: false,
+      scoring: false,
     };
 
     const elements = {
@@ -591,6 +631,8 @@ APP_HTML = """<!doctype html>
       showAnswerButton: document.querySelector("#showAnswerButton"),
       answerText: document.querySelector("#answerText"),
       answerInput: document.querySelector("#answerInput"),
+      scoreAnswerButton: document.querySelector("#scoreAnswerButton"),
+      scoreResult: document.querySelector("#scoreResult"),
       ratingButtons: Array.from(document.querySelectorAll("[data-rating]")),
       doneLoadingText: document.querySelector("#doneLoadingText"),
       doneEmptyState: document.querySelector("#doneEmptyState"),
@@ -718,6 +760,7 @@ APP_HTML = """<!doctype html>
 
     function setButtonsDisabled(disabled, activeRating = null) {
       elements.showAnswerButton.disabled = disabled;
+      elements.scoreAnswerButton.disabled = disabled || state.scoring;
       elements.ratingButtons.forEach((button) => {
         if (!button.dataset.originalText) {
           button.dataset.originalText = button.textContent;
@@ -1102,6 +1145,7 @@ APP_HTML = """<!doctype html>
     function renderCard(card) {
       state.currentCard = card;
       state.cardStartedAt = Date.now();
+      state.scoring = false;
 
       setText(elements.categoryText, formatValue(card.category));
       setText(elements.difficultyText, formatValue(card.difficulty));
@@ -1112,10 +1156,103 @@ APP_HTML = """<!doctype html>
       fillScheduleInfo(elements.scheduleInfo, card);
       elements.currentEditContainer.replaceChildren();
       elements.answerInput.value = "";
+      elements.scoreResult.replaceChildren();
+      elements.scoreResult.classList.remove("visible");
       elements.answerText.classList.remove("visible");
       elements.showAnswerButton.textContent = "显示答案";
       elements.cardPanel.classList.remove("hidden");
       setButtonsDisabled(false);
+    }
+
+
+    function createList(items, className = "") {
+      const list = document.createElement("ul");
+      if (!items.length) {
+        const emptyItem = document.createElement("li");
+        emptyItem.textContent = "暂无";
+        list.appendChild(emptyItem);
+        return list;
+      }
+      items.forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        if (className) {
+          li.className = className;
+        }
+        list.appendChild(li);
+      });
+      return list;
+    }
+
+    function createScoreBlock(title, content) {
+      const block = document.createElement("div");
+      const heading = document.createElement("strong");
+      heading.textContent = title;
+      block.appendChild(heading);
+      if (Array.isArray(content)) {
+        block.appendChild(createList(content));
+      } else {
+        const paragraph = document.createElement("p");
+        paragraph.textContent = content || "暂无";
+        block.appendChild(paragraph);
+      }
+      return block;
+    }
+
+    function renderScoreResult(score) {
+      const title = document.createElement("h3");
+      title.textContent = `总分：${score.total_score}/100`;
+
+      const dimensions = Object.entries(score.dimension_scores || {}).map(
+        ([name, value]) => `${formatValue(name)}：${value}/10`
+      );
+
+      elements.scoreResult.replaceChildren(
+        title,
+        createScoreBlock("分项评分", dimensions),
+        createScoreBlock("优点", score.strengths || []),
+        createScoreBlock("主要问题", score.problems || []),
+        createScoreBlock("风险表达", score.risk_expressions || []),
+        createScoreBlock("优化建议", score.suggestions || []),
+        createScoreBlock("30 秒优化版", score.optimized_answer_30s || ""),
+        createScoreBlock("记忆标签", score.memory_labels || [])
+      );
+
+      elements.scoreResult.querySelectorAll("div:nth-of-type(4) li").forEach((item) => {
+        item.classList.add("score-risk");
+      });
+      elements.scoreResult.classList.add("visible");
+    }
+
+    async function scoreCurrentAnswer() {
+      if (!state.currentCard || state.scoring || state.submitting) {
+        return;
+      }
+
+      clearError();
+      clearSuccess();
+      const answerText = elements.answerInput.value.trim();
+      state.scoring = true;
+      elements.scoreAnswerButton.disabled = true;
+      elements.scoreAnswerButton.textContent = "评分中...";
+
+      try {
+        const score = await fetchJson("/api/v1/answer-arena/score", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            card_id: state.currentCard.id,
+            user_answer: answerText,
+          }),
+        });
+        renderScoreResult(score);
+      } catch (error) {
+        showError(`评分失败：${error.message}`);
+      } finally {
+        state.scoring = false;
+        elements.scoreAnswerButton.disabled = false;
+        elements.scoreAnswerButton.textContent = "答题评分";
+      }
     }
 
     function toggleAnswer() {
@@ -1162,6 +1299,7 @@ APP_HTML = """<!doctype html>
     }
 
     elements.showAnswerButton.addEventListener("click", toggleAnswer);
+    elements.scoreAnswerButton.addEventListener("click", scoreCurrentAnswer);
     elements.editCurrentCardButton.addEventListener("click", () => {
       if (state.currentCard) {
         toggleCardEditor(state.currentCard, elements.currentEditContainer);
