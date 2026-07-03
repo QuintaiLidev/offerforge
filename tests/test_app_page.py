@@ -50,11 +50,14 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "historyList" in response.text
     assert "展开历史" in response.text
     assert "我的回答" in response.text
-    assert "答题评分" in response.text
     assert "scoreCurrentAnswer" in response.text
+    assert "规则评分" in response.text
     assert "aiScoreAnswerButton" in response.text
     assert "AI评分" in response.text
+    assert 'scoreCurrentAnswer("rule")' in response.text
     assert 'scoreCurrentAnswer("ai")' in response.text
+    assert 'addEventListener("click", scoreCurrentAnswer)' not in response.text
+    assert "请至少输入 30 字回答后再评分" in response.text
     assert "mode," in response.text
     assert "provider:" in response.text
     assert "/api/v1/answer-arena/score" in response.text

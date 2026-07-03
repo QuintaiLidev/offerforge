@@ -81,12 +81,27 @@ class OpenAIAnswerScoreProvider:
         timeout_seconds: int,
     ) -> None:
         try:
-            from openai import APITimeoutError, OpenAI
+            from openai import (
+                APIConnectionError,
+                APIStatusError,
+                APITimeoutError,
+                AuthenticationError,
+                BadRequestError,
+                OpenAI,
+                PermissionDeniedError,
+                RateLimitError,
+            )
         except ImportError as exc:
             raise AiScoringUnavailableError(
                 "OpenAI SDK is not installed for AI scoring."
             ) from exc
 
+        self._authentication_error = AuthenticationError
+        self._permission_denied_error = PermissionDeniedError
+        self._rate_limit_error = RateLimitError
+        self._bad_request_error = BadRequestError
+        self._api_connection_error = APIConnectionError
+        self._api_status_error = APIStatusError
         self._timeout_error = APITimeoutError
         self._client = OpenAI(api_key=api_key, timeout=timeout_seconds)
         self._model = model
@@ -118,6 +133,31 @@ class OpenAIAnswerScoreProvider:
             )
         except self._timeout_error as exc:
             raise AiScoringTimeoutError("AI scoring provider timed out.") from exc
+        except self._authentication_error as exc:
+            raise AiScoringUnavailableError(
+                "AI scoring authentication failed. Check OPENAI_API_KEY."
+            ) from exc
+        except self._permission_denied_error as exc:
+            raise AiScoringUnavailableError(
+                "AI scoring permission denied. Check project permissions."
+            ) from exc
+        except self._rate_limit_error as exc:
+            raise AiScoringUnavailableError(
+                "AI scoring rate limited or quota exceeded."
+            ) from exc
+        except self._bad_request_error as exc:
+            raise AiScoringUnavailableError(
+                "AI scoring request was rejected by provider. Check model and request format."
+            ) from exc
+        except self._api_connection_error as exc:
+            raise AiScoringUnavailableError(
+                "AI scoring provider connection failed."
+            ) from exc
+        except self._api_status_error as exc:
+            status_code = getattr(exc, "status_code", "unknown")
+            raise AiScoringUnavailableError(
+                f"AI scoring provider returned status {status_code}."
+            ) from exc
         except Exception as exc:
             raise AiScoringUnavailableError(
                 "AI scoring provider request failed."

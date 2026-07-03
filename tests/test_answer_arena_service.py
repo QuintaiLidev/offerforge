@@ -7,10 +7,14 @@ from app.models.enums import KnowledgeCategory
 from app.repositories import KnowledgeCardRepository
 from app.schemas.answer_arena import ANSWER_SCORE_DIMENSIONS, AnswerScoreResponse
 from app.schemas.knowledge_card import KnowledgeCardCreate
-from app.services.answer_score_provider import parse_ai_score_payload
+from app.services.answer_score_provider import (
+    OpenAIAnswerScoreProvider,
+    parse_ai_score_payload,
+)
 from app.services.answer_arena import AnswerArenaService
 from app.services.exceptions import (
     AiScoringInvalidResponseError,
+    AiScoringTimeoutError,
     AiScoringUnavailableError,
 )
 
@@ -172,3 +176,128 @@ def test_ai_score_payload_parser_rejects_missing_dimensions() -> None:
             },
             provider="openai",
         )
+
+
+class FakeAuthenticationError(Exception):
+    pass
+
+
+class FakePermissionDeniedError(Exception):
+    pass
+
+
+class FakeRateLimitError(Exception):
+    pass
+
+
+class FakeBadRequestError(Exception):
+    pass
+
+
+class FakeApiConnectionError(Exception):
+    pass
+
+
+class FakeApiStatusError(Exception):
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+        super().__init__("provider response should not leak")
+
+
+class FakeApiTimeoutError(Exception):
+    pass
+
+
+class FakeCompletions:
+    def __init__(self, exc: Exception) -> None:
+        self.exc = exc
+
+    def create(self, **kwargs):
+        raise self.exc
+
+
+class FakeChat:
+    def __init__(self, exc: Exception) -> None:
+        self.completions = FakeCompletions(exc)
+
+
+class FakeOpenAIClient:
+    def __init__(self, exc: Exception) -> None:
+        self.chat = FakeChat(exc)
+
+
+def make_openai_provider_raising(exc: Exception) -> OpenAIAnswerScoreProvider:
+    provider = OpenAIAnswerScoreProvider.__new__(OpenAIAnswerScoreProvider)
+    provider._authentication_error = FakeAuthenticationError
+    provider._permission_denied_error = FakePermissionDeniedError
+    provider._rate_limit_error = FakeRateLimitError
+    provider._bad_request_error = FakeBadRequestError
+    provider._api_connection_error = FakeApiConnectionError
+    provider._api_status_error = FakeApiStatusError
+    provider._timeout_error = FakeApiTimeoutError
+    provider._client = FakeOpenAIClient(exc)
+    provider._model = "fake-model"
+    return provider
+
+
+@pytest.mark.parametrize(
+    ("exc", "expected_error", "message"),
+    [
+        (
+            FakeAuthenticationError("bad real-key"),
+            AiScoringUnavailableError,
+            "AI scoring authentication failed. Check OPENAI_API_KEY.",
+        ),
+        (
+            FakePermissionDeniedError("denied"),
+            AiScoringUnavailableError,
+            "AI scoring permission denied. Check project permissions.",
+        ),
+        (
+            FakeRateLimitError("quota"),
+            AiScoringUnavailableError,
+            "AI scoring rate limited or quota exceeded.",
+        ),
+        (
+            FakeBadRequestError("bad request"),
+            AiScoringUnavailableError,
+            "AI scoring request was rejected by provider. Check model and request format.",
+        ),
+        (
+            FakeApiConnectionError("network"),
+            AiScoringUnavailableError,
+            "AI scoring provider connection failed.",
+        ),
+        (
+            FakeApiStatusError(500),
+            AiScoringUnavailableError,
+            "AI scoring provider returned status 500.",
+        ),
+        (
+            FakeApiTimeoutError("timeout"),
+            AiScoringTimeoutError,
+            "AI scoring provider timed out.",
+        ),
+    ],
+)
+def test_openai_provider_returns_safe_error_messages(
+    db_session,
+    exc: Exception,
+    expected_error: type[Exception],
+    message: str,
+) -> None:
+    card = create_card(
+        db_session,
+        title="AI provider error",
+        category=KnowledgeCategory.PROJECT_EXPLANATION,
+    )
+    provider = make_openai_provider_raising(exc)
+    user_answer = "This answer includes sensitive interview notes that must not leak."
+
+    with pytest.raises(expected_error) as raised:
+        provider.score(card=card, user_answer=user_answer)
+
+    assert str(raised.value) == message
+    assert user_answer not in str(raised.value)
+    assert "real-key" not in str(raised.value)
+    assert "provider response should not leak" not in str(raised.value)

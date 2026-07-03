@@ -644,6 +644,9 @@ APP_HTML = """<!doctype html>
       historyList: document.querySelector("#historyList"),
     };
 
+    elements.scoreAnswerButton.textContent = "规则评分";
+    elements.aiScoreAnswerButton.textContent = "AI评分";
+
     function setText(element, value) {
       element.textContent = value || "";
     }
@@ -817,6 +820,9 @@ APP_HTML = """<!doctype html>
       elements.cardPanel.classList.add("hidden");
       elements.modeText.classList.add("hidden");
       setButtonsDisabled(true);
+      if (mode === "ai") {
+        elements.scoreAnswerButton.textContent = "规则评分";
+      }
 
       try {
         const today = await fetchJson("/api/v1/reviews/today?limit=10");
@@ -1231,6 +1237,17 @@ APP_HTML = """<!doctype html>
       elements.scoreResult.classList.add("visible");
     }
 
+    function renderScoreError(message) {
+      const title = document.createElement("h3");
+      title.textContent = "评分失败";
+
+      const detail = document.createElement("p");
+      detail.textContent = message;
+
+      elements.scoreResult.replaceChildren(title, detail);
+      elements.scoreResult.classList.add("visible");
+    }
+
     async function scoreCurrentAnswer(mode = "rule") {
       if (!state.currentCard || state.scoring || state.submitting) {
         return;
@@ -1239,13 +1256,21 @@ APP_HTML = """<!doctype html>
       clearError();
       clearSuccess();
       const answerText = elements.answerInput.value.trim();
+      if (answerText.length < 30) {
+        const message = "请至少输入 30 字回答后再评分";
+        showError(message);
+        renderScoreError(message);
+        return;
+      }
       state.scoring = true;
       const activeScoreButton =
         mode === "ai" ? elements.aiScoreAnswerButton : elements.scoreAnswerButton;
       elements.scoreAnswerButton.disabled = true;
       elements.aiScoreAnswerButton.disabled = true;
-      activeScoreButton.textContent = mode === "ai" ? "AI scoring..." : "Scoring...";
-      elements.scoreAnswerButton.textContent = "评分中...";
+      activeScoreButton.textContent = mode === "ai" ? "AI评分中..." : "规则评分中...";
+      if (mode === "ai") {
+        elements.scoreAnswerButton.textContent = "规则评分";
+      }
 
       try {
         const score = await fetchJson("/api/v1/answer-arena/score", {
@@ -1259,13 +1284,15 @@ APP_HTML = """<!doctype html>
         });
         renderScoreResult(score);
       } catch (error) {
-        showError(`评分失败：${error.message}`);
+        const message = `评分失败：${error.message}`;
+        showError(message);
+        renderScoreError(message);
       } finally {
         state.scoring = false;
         elements.scoreAnswerButton.disabled = false;
         elements.aiScoreAnswerButton.disabled = false;
+        elements.scoreAnswerButton.textContent = "规则评分";
         elements.aiScoreAnswerButton.textContent = "AI评分";
-        elements.scoreAnswerButton.textContent = "答题评分";
       }
     }
 
@@ -1313,7 +1340,7 @@ APP_HTML = """<!doctype html>
     }
 
     elements.showAnswerButton.addEventListener("click", toggleAnswer);
-    elements.scoreAnswerButton.addEventListener("click", scoreCurrentAnswer);
+    elements.scoreAnswerButton.addEventListener("click", () => scoreCurrentAnswer("rule"));
     elements.aiScoreAnswerButton.addEventListener("click", () => scoreCurrentAnswer("ai"));
     elements.editCurrentCardButton.addEventListener("click", () => {
       if (state.currentCard) {
