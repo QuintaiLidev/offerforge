@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.repositories import KnowledgeCardRepository, PracticeAttemptRepository
 from app.services import KnowledgeCardService, PracticeAttemptService, ReviewService
@@ -39,4 +40,4 @@ def get_answer_arena_service(
     db: Annotated[Session, Depends(get_db)],
 ) -> AnswerArenaService:
     card_repository = KnowledgeCardRepository(db)
-    return AnswerArenaService(card_repository)
+    return AnswerArenaService(card_repository, settings=get_settings())

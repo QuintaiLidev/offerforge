@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import re
+from typing import Protocol
 
+from app.core.config import Settings, get_settings
 from app.models import KnowledgeCard
 from app.models.enums import KnowledgeCategory
 from app.repositories import KnowledgeCardRepository
 from app.schemas.answer_arena import ANSWER_SCORE_DIMENSIONS, AnswerScoreResponse
-from app.services.exceptions import KnowledgeCardNotFoundError
+from app.services.answer_score_provider import OpenAIAnswerScoreProvider
+from app.services.exceptions import (
+    AiScoringUnavailableError,
+    KnowledgeCardNotFoundError,
+)
 
 STRUCTURE_KEYWORDS = ("首先", "第一", "第二", "比如", "举个例子", "最后", "所以", "我的理解是", "我负责", "我会先")
 EXAMPLE_KEYWORDS = ("项目", "接口", "自动化", "CI", "SQL", "数据库", "权限", "线上", "缺陷", "回归", "工具", "维护", "定位")
@@ -65,16 +71,69 @@ def _extract_optimized_answer(reference_answer: str) -> str:
     return first_line[:240] or "建议先用一句结论正面回答，再补两个要点、一个例子和一句收尾。"
 
 
-class AnswerArenaService:
-    def __init__(self, card_repository: KnowledgeCardRepository) -> None:
-        self.card_repository = card_repository
+class AnswerScoreProvider(Protocol):
+    def score(
+        self,
+        *,
+        card: KnowledgeCard,
+        user_answer: str,
+    ) -> AnswerScoreResponse:
+        """Score an answer without mutating OfferForge state."""
 
-    def score_answer(self, *, card_id: int, user_answer: str) -> AnswerScoreResponse:
+
+class AnswerArenaService:
+    def __init__(
+        self,
+        card_repository: KnowledgeCardRepository,
+        *,
+        ai_provider: AnswerScoreProvider | None = None,
+        settings: Settings | None = None,
+    ) -> None:
+        self.card_repository = card_repository
+        self.ai_provider = ai_provider
+        self.settings = settings or get_settings()
+
+    def score_answer(
+        self,
+        *,
+        card_id: int,
+        user_answer: str,
+        mode: str = "rule",
+    ) -> AnswerScoreResponse:
         card = self.card_repository.get_by_id(card_id)
         if card is None:
             raise KnowledgeCardNotFoundError(card_id)
 
         answer = user_answer.strip()
+        if mode == "ai":
+            return self._score_answer_with_ai(card=card, user_answer=answer)
+        return self._score_answer_with_rules(card=card, user_answer=answer)
+
+    def _score_answer_with_ai(
+        self,
+        *,
+        card: KnowledgeCard,
+        user_answer: str,
+    ) -> AnswerScoreResponse:
+        if not self.settings.openai_api_key:
+            raise AiScoringUnavailableError(
+                "OpenAI API key is not configured for AI scoring."
+            )
+
+        provider = self.ai_provider or OpenAIAnswerScoreProvider(
+            api_key=self.settings.openai_api_key,
+            model=self.settings.openai_model,
+            timeout_seconds=self.settings.ai_score_timeout_seconds,
+        )
+        return provider.score(card=card, user_answer=user_answer)
+
+    def _score_answer_with_rules(
+        self,
+        *,
+        card: KnowledgeCard,
+        user_answer: str,
+    ) -> AnswerScoreResponse:
+        answer = user_answer
         structure_hits = _contains_any(answer, STRUCTURE_KEYWORDS)
         example_hits = _contains_any(answer, EXAMPLE_KEYWORDS)
         boundary_hits = _contains_any(answer, BOUNDARY_KEYWORDS)
@@ -140,6 +199,7 @@ class AnswerArenaService:
             memory_labels.append("风险话术")
 
         return AnswerScoreResponse(
+            provider="rule",
             total_score=total,
             dimension_scores={dimension: scores[dimension] for dimension in ANSWER_SCORE_DIMENSIONS},
             strengths=strengths,

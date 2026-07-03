@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import pytest
+
+from app.core.config import Settings
 from app.models.enums import KnowledgeCategory
 from app.repositories import KnowledgeCardRepository
+from app.schemas.answer_arena import ANSWER_SCORE_DIMENSIONS, AnswerScoreResponse
 from app.schemas.knowledge_card import KnowledgeCardCreate
+from app.services.answer_score_provider import parse_ai_score_payload
 from app.services.answer_arena import AnswerArenaService
+from app.services.exceptions import (
+    AiScoringInvalidResponseError,
+    AiScoringUnavailableError,
+)
 
 
 def create_card(db_session, *, title: str, category: KnowledgeCategory, reference_answer: str = "【30秒口述版】先结论，再讲两个要点，一个例子，最后收尾。", tags: list[str] | None = None):
@@ -29,6 +38,7 @@ def test_service_returns_total_score_and_seven_dimensions(db_session) -> None:
     )
 
     assert 0 <= result.total_score <= 100
+    assert result.provider == "rule"
     assert set(result.dimension_scores) == {
         "direct_answer",
         "structure",
@@ -82,3 +92,83 @@ def test_career_python_automation_risk_is_detected(db_session) -> None:
 
     assert "想做 Python 自动化" in result.risk_expressions
     assert "外包没发展" in result.risk_expressions
+
+class FakeAiScoreProvider:
+    def __init__(self) -> None:
+        self.calls: list[tuple[int, str]] = []
+
+    def score(self, *, card, user_answer: str) -> AnswerScoreResponse:
+        self.calls.append((card.id, user_answer))
+        return AnswerScoreResponse(
+            provider="openai",
+            total_score=88,
+            dimension_scores={dimension: 8 for dimension in ANSWER_SCORE_DIMENSIONS},
+            strengths=["clear structure"],
+            problems=["needs one sharper example"],
+            risk_expressions=[],
+            suggestions=["add a concrete project detail"],
+            optimized_answer_30s="A concise AI-scored answer.",
+            memory_labels=["structure"],
+        )
+
+
+def test_service_can_score_with_injected_ai_provider(db_session) -> None:
+    card = create_card(
+        db_session,
+        title="AI scoring",
+        category=KnowledgeCategory.PROJECT_EXPLANATION,
+    )
+    provider = FakeAiScoreProvider()
+    service = AnswerArenaService(
+        KnowledgeCardRepository(db_session),
+        ai_provider=provider,
+        settings=Settings(openai_api_key="test-key"),
+    )
+
+    result = service.score_answer(
+        card_id=card.id,
+        mode="ai",
+        user_answer="This answer is long enough and uses a structured project example.",
+    )
+
+    assert result.provider == "openai"
+    assert result.total_score == 88
+    assert provider.calls == [
+        (card.id, "This answer is long enough and uses a structured project example.")
+    ]
+
+
+def test_service_rejects_ai_mode_without_openai_key(db_session) -> None:
+    card = create_card(
+        db_session,
+        title="AI scoring without key",
+        category=KnowledgeCategory.PROJECT_EXPLANATION,
+    )
+    service = AnswerArenaService(
+        KnowledgeCardRepository(db_session),
+        settings=Settings(openai_api_key=None),
+    )
+
+    with pytest.raises(AiScoringUnavailableError):
+        service.score_answer(
+            card_id=card.id,
+            mode="ai",
+            user_answer="This answer is long enough and structured for scoring.",
+        )
+
+
+def test_ai_score_payload_parser_rejects_missing_dimensions() -> None:
+    with pytest.raises(AiScoringInvalidResponseError):
+        parse_ai_score_payload(
+            {
+                "total_score": 70,
+                "dimension_scores": {"direct_answer": 7},
+                "strengths": [],
+                "problems": [],
+                "risk_expressions": [],
+                "suggestions": [],
+                "optimized_answer_30s": "summary",
+                "memory_labels": [],
+            },
+            provider="openai",
+        )

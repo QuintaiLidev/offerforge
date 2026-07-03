@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field, field_validator
 
 from app.schemas.common import SchemaModel, strip_non_empty_string
@@ -18,6 +20,7 @@ ANSWER_SCORE_DIMENSIONS = (
 class AnswerScoreRequest(SchemaModel):
     card_id: int = Field(gt=0)
     user_answer: str = Field(min_length=30)
+    mode: Literal["rule", "ai"] = "rule"
 
     @field_validator("user_answer", mode="before")
     @classmethod
@@ -26,6 +29,7 @@ class AnswerScoreRequest(SchemaModel):
 
 
 class AnswerScoreResponse(SchemaModel):
+    provider: str
     total_score: int = Field(ge=0, le=100)
     dimension_scores: dict[str, int]
     strengths: list[str]

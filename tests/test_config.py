@@ -14,6 +14,10 @@ def test_default_host_and_port_are_local_only() -> None:
     assert settings.database_url == f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}"
     assert settings.auto_seed_on_startup is True
     assert settings.auto_seed_path == DEFAULT_AUTO_SEED_PATH
+    assert settings.ai_score_provider == "rule"
+    assert settings.openai_api_key is None
+    assert settings.openai_model == "gpt-4o-mini"
+    assert settings.ai_score_timeout_seconds == 20
 
 
 def test_test_environment_can_override_database_path(tmp_path: Path) -> None:
@@ -81,3 +85,19 @@ def test_auto_seed_settings_can_be_overridden(tmp_path: Path) -> None:
 
     assert settings.auto_seed_on_startup is True
     assert settings.auto_seed_path == seed_path
+
+
+def test_ai_score_settings_can_be_loaded_from_environment() -> None:
+    settings = load_settings(
+        {
+            "OFFERFORGE_AI_SCORE_PROVIDER": "ai",
+            "OPENAI_API_KEY": "test-openai-key",
+            "OFFERFORGE_OPENAI_MODEL": "gpt-4o-mini-2026",
+            "OFFERFORGE_AI_SCORE_TIMEOUT_SECONDS": "12",
+        }
+    )
+
+    assert settings.ai_score_provider == "ai"
+    assert settings.openai_api_key == "test-openai-key"
+    assert settings.openai_model == "gpt-4o-mini-2026"
+    assert settings.ai_score_timeout_seconds == 12

@@ -7,6 +7,18 @@ class ServiceError(Exception):
     """Base exception for service-layer errors."""
 
 
+class AiScoringUnavailableError(ServiceError):
+    """Raised when AI scoring cannot be used in the current environment."""
+
+
+class AiScoringTimeoutError(ServiceError):
+    """Raised when the AI scoring provider times out."""
+
+
+class AiScoringInvalidResponseError(ServiceError):
+    """Raised when the AI scoring provider returns an invalid payload."""
+
+
 class KnowledgeCardNotFoundError(ServiceError):
     def __init__(self, card_id: int) -> None:
         self.card_id = card_id

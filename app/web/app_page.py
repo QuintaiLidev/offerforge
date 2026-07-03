@@ -571,6 +571,7 @@ APP_HTML = """<!doctype html>
           placeholder="先写下或粘贴你的回答，再点击答题评分"
         ></textarea>
         <button id="scoreAnswerButton" class="answer-score-button" type="button">答题评分</button>
+        <button id="aiScoreAnswerButton" class="answer-score-button" type="button">AI评分</button>
         <div id="scoreResult" class="score-result" aria-live="polite"></div>
       </div>
 
@@ -632,6 +633,7 @@ APP_HTML = """<!doctype html>
       answerText: document.querySelector("#answerText"),
       answerInput: document.querySelector("#answerInput"),
       scoreAnswerButton: document.querySelector("#scoreAnswerButton"),
+      aiScoreAnswerButton: document.querySelector("#aiScoreAnswerButton"),
       scoreResult: document.querySelector("#scoreResult"),
       ratingButtons: Array.from(document.querySelectorAll("[data-rating]")),
       doneLoadingText: document.querySelector("#doneLoadingText"),
@@ -761,6 +763,7 @@ APP_HTML = """<!doctype html>
     function setButtonsDisabled(disabled, activeRating = null) {
       elements.showAnswerButton.disabled = disabled;
       elements.scoreAnswerButton.disabled = disabled || state.scoring;
+      elements.aiScoreAnswerButton.disabled = disabled || state.scoring;
       elements.ratingButtons.forEach((button) => {
         if (!button.dataset.originalText) {
           button.dataset.originalText = button.textContent;
@@ -1203,12 +1206,16 @@ APP_HTML = """<!doctype html>
       const title = document.createElement("h3");
       title.textContent = `总分：${score.total_score}/100`;
 
+      const provider = document.createElement("p");
+      provider.textContent = `provider: ${score.provider || "rule"}`;
+
       const dimensions = Object.entries(score.dimension_scores || {}).map(
         ([name, value]) => `${formatValue(name)}：${value}/10`
       );
 
       elements.scoreResult.replaceChildren(
         title,
+        provider,
         createScoreBlock("分项评分", dimensions),
         createScoreBlock("优点", score.strengths || []),
         createScoreBlock("主要问题", score.problems || []),
@@ -1224,7 +1231,7 @@ APP_HTML = """<!doctype html>
       elements.scoreResult.classList.add("visible");
     }
 
-    async function scoreCurrentAnswer() {
+    async function scoreCurrentAnswer(mode = "rule") {
       if (!state.currentCard || state.scoring || state.submitting) {
         return;
       }
@@ -1233,7 +1240,11 @@ APP_HTML = """<!doctype html>
       clearSuccess();
       const answerText = elements.answerInput.value.trim();
       state.scoring = true;
+      const activeScoreButton =
+        mode === "ai" ? elements.aiScoreAnswerButton : elements.scoreAnswerButton;
       elements.scoreAnswerButton.disabled = true;
+      elements.aiScoreAnswerButton.disabled = true;
+      activeScoreButton.textContent = mode === "ai" ? "AI scoring..." : "Scoring...";
       elements.scoreAnswerButton.textContent = "评分中...";
 
       try {
@@ -1243,6 +1254,7 @@ APP_HTML = """<!doctype html>
           body: JSON.stringify({
             card_id: state.currentCard.id,
             user_answer: answerText,
+            mode,
           }),
         });
         renderScoreResult(score);
@@ -1251,6 +1263,8 @@ APP_HTML = """<!doctype html>
       } finally {
         state.scoring = false;
         elements.scoreAnswerButton.disabled = false;
+        elements.aiScoreAnswerButton.disabled = false;
+        elements.aiScoreAnswerButton.textContent = "AI评分";
         elements.scoreAnswerButton.textContent = "答题评分";
       }
     }
@@ -1300,6 +1314,7 @@ APP_HTML = """<!doctype html>
 
     elements.showAnswerButton.addEventListener("click", toggleAnswer);
     elements.scoreAnswerButton.addEventListener("click", scoreCurrentAnswer);
+    elements.aiScoreAnswerButton.addEventListener("click", () => scoreCurrentAnswer("ai"));
     elements.editCurrentCardButton.addEventListener("click", () => {
       if (state.currentCard) {
         toggleCardEditor(state.currentCard, elements.currentEditContainer);

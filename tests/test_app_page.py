@@ -52,6 +52,11 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "我的回答" in response.text
     assert "答题评分" in response.text
     assert "scoreCurrentAnswer" in response.text
+    assert "aiScoreAnswerButton" in response.text
+    assert "AI评分" in response.text
+    assert 'scoreCurrentAnswer("ai")' in response.text
+    assert "mode," in response.text
+    assert "provider:" in response.text
     assert "/api/v1/answer-arena/score" in response.text
     assert "renderScoreResult" in response.text
     assert "编辑卡片" in response.text

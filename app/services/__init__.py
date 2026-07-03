@@ -1,6 +1,9 @@
 """Service-layer exports for OfferForge."""
 
 from app.services.exceptions import (
+    AiScoringInvalidResponseError,
+    AiScoringTimeoutError,
+    AiScoringUnavailableError,
     DuplicateKnowledgeCardError,
     KnowledgeCardSourceHasAttemptsError,
     KnowledgeCardNotFoundError,
@@ -14,6 +17,9 @@ from app.services.review import ReviewService
 from app.services.seed import seed_knowledge_cards_if_empty
 
 __all__ = [
+    "AiScoringInvalidResponseError",
+    "AiScoringTimeoutError",
+    "AiScoringUnavailableError",
     "AnswerArenaService",
     "DuplicateKnowledgeCardError",
     "KnowledgeCardSourceHasAttemptsError",

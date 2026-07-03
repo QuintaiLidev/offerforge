@@ -29,6 +29,10 @@ class Settings(BaseModel):
     auth_password: str | None = None
     auto_seed_on_startup: bool = True
     auto_seed_path: Path = DEFAULT_AUTO_SEED_PATH
+    ai_score_provider: str = "rule"
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
+    ai_score_timeout_seconds: int = 20
 
     @field_validator("database_path", mode="after")
     @classmethod
@@ -58,6 +62,46 @@ class Settings(BaseModel):
         if value.is_absolute():
             return value
         return (PROJECT_ROOT / value).resolve()
+
+    @field_validator("ai_score_provider", mode="before")
+    @classmethod
+    def normalize_ai_score_provider(cls, value: object) -> object:
+        if value is None:
+            return "rule"
+        if not isinstance(value, str):
+            return value
+
+        normalized = value.strip().lower()
+        if normalized not in {"rule", "ai"}:
+            raise ValueError("OFFERFORGE_AI_SCORE_PROVIDER must be rule or ai.")
+        return normalized
+
+    @field_validator("openai_api_key", mode="before")
+    @classmethod
+    def normalize_openai_api_key(cls, value: object) -> object:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            return value
+        stripped = value.strip()
+        return stripped or None
+
+    @field_validator("openai_model", mode="before")
+    @classmethod
+    def normalize_openai_model(cls, value: object) -> object:
+        if value is None:
+            return "gpt-4o-mini"
+        if not isinstance(value, str):
+            return value
+        stripped = value.strip()
+        return stripped or "gpt-4o-mini"
+
+    @field_validator("ai_score_timeout_seconds")
+    @classmethod
+    def validate_ai_score_timeout_seconds(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("OFFERFORGE_AI_SCORE_TIMEOUT_SECONDS must be positive.")
+        return value
 
     @model_validator(mode="after")
     def validate_auth_credentials(self) -> "Settings":
@@ -121,6 +165,13 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         ),
         auto_seed_path=Path(
             env.get("OFFERFORGE_AUTO_SEED_PATH", str(DEFAULT_AUTO_SEED_PATH))
+        ),
+        ai_score_provider=env.get("OFFERFORGE_AI_SCORE_PROVIDER", "rule"),
+        openai_api_key=env.get("OPENAI_API_KEY") or None,
+        openai_model=env.get("OFFERFORGE_OPENAI_MODEL", "gpt-4o-mini"),
+        ai_score_timeout_seconds=_read_int(
+            env.get("OFFERFORGE_AI_SCORE_TIMEOUT_SECONDS"),
+            20,
         ),
     )
 

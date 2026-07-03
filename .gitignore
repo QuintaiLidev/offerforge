@@ -28,3 +28,4 @@ data/*.db-*
 .codex/
 
 .pytest-tmp/
+.pytest-tmp-run*/

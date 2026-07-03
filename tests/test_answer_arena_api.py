@@ -7,12 +7,19 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
+from app.api.deps import get_answer_arena_service
+from app.core.config import Settings, get_settings
 from app.main import app
 from app.models import KnowledgeCard, PracticeAttempt
 from app.models.enums import KnowledgeCategory
 from app.repositories import KnowledgeCardRepository
+from app.schemas.answer_arena import ANSWER_SCORE_DIMENSIONS, AnswerScoreResponse
 from app.schemas.knowledge_card import KnowledgeCardCreate
+from app.services.answer_arena import AnswerArenaService
+from app.services.exceptions import (
+    AiScoringInvalidResponseError,
+    AiScoringTimeoutError,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -119,3 +126,155 @@ async def test_score_api_detects_ai_risk_expression(client: httpx.AsyncClient, d
     data = response.json()
     assert "AI 写了 80%" in data["risk_expressions"]
     assert data["dimension_scores"]["risk_control"] < 6
+
+
+class FakeAiProvider:
+    def score(self, *, card: KnowledgeCard, user_answer: str) -> AnswerScoreResponse:
+        return AnswerScoreResponse(
+            provider="openai",
+            total_score=91,
+            dimension_scores={dimension: 9 for dimension in ANSWER_SCORE_DIMENSIONS},
+            strengths=["specific"],
+            problems=[],
+            risk_expressions=[],
+            suggestions=["keep it concise"],
+            optimized_answer_30s="AI optimized answer.",
+            memory_labels=["ai"],
+        )
+
+
+class TimeoutAiProvider:
+    def score(self, *, card: KnowledgeCard, user_answer: str) -> AnswerScoreResponse:
+        raise AiScoringTimeoutError("AI scoring provider timed out.")
+
+
+class InvalidAiProvider:
+    def score(self, *, card: KnowledgeCard, user_answer: str) -> AnswerScoreResponse:
+        raise AiScoringInvalidResponseError("AI scoring response was invalid.")
+
+
+async def test_score_api_rule_mode_returns_rule_provider(
+    client: httpx.AsyncClient,
+    db_session: Session,
+) -> None:
+    card = create_card(db_session)
+
+    response = await client.post(
+        "/api/v1/answer-arena/score",
+        json={
+            "card_id": card.id,
+            "mode": "rule",
+            "user_answer": "This answer is long enough and includes a structured project example for scoring.",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider"] == "rule"
+
+
+async def test_score_api_ai_mode_uses_mocked_provider(
+    client: httpx.AsyncClient,
+    db_session: Session,
+) -> None:
+    card = create_card(db_session)
+
+    def override_service() -> AnswerArenaService:
+        return AnswerArenaService(
+            KnowledgeCardRepository(db_session),
+            ai_provider=FakeAiProvider(),
+            settings=Settings(openai_api_key="test-key"),
+        )
+
+    app.dependency_overrides[get_answer_arena_service] = override_service
+
+    response = await client.post(
+        "/api/v1/answer-arena/score",
+        json={
+            "card_id": card.id,
+            "mode": "ai",
+            "user_answer": "This answer is long enough and includes a structured project example for scoring.",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider"] == "openai"
+    assert data["total_score"] == 91
+    assert db_session.scalar(
+        select(PracticeAttempt).where(PracticeAttempt.knowledge_card_id == card.id)
+    ) is None
+
+
+async def test_score_api_ai_mode_without_key_returns_503(
+    client: httpx.AsyncClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    get_settings.cache_clear()
+    card = create_card(db_session)
+
+    response = await client.post(
+        "/api/v1/answer-arena/score",
+        json={
+            "card_id": card.id,
+            "mode": "ai",
+            "user_answer": "This answer is long enough and includes a structured project example for scoring.",
+        },
+    )
+
+    assert response.status_code == 503
+
+
+async def test_score_api_ai_timeout_returns_504(
+    client: httpx.AsyncClient,
+    db_session: Session,
+) -> None:
+    card = create_card(db_session)
+
+    def override_service() -> AnswerArenaService:
+        return AnswerArenaService(
+            KnowledgeCardRepository(db_session),
+            ai_provider=TimeoutAiProvider(),
+            settings=Settings(openai_api_key="test-key"),
+        )
+
+    app.dependency_overrides[get_answer_arena_service] = override_service
+
+    response = await client.post(
+        "/api/v1/answer-arena/score",
+        json={
+            "card_id": card.id,
+            "mode": "ai",
+            "user_answer": "This answer is long enough and includes a structured project example for scoring.",
+        },
+    )
+
+    assert response.status_code == 504
+
+
+async def test_score_api_ai_invalid_response_returns_503(
+    client: httpx.AsyncClient,
+    db_session: Session,
+) -> None:
+    card = create_card(db_session)
+
+    def override_service() -> AnswerArenaService:
+        return AnswerArenaService(
+            KnowledgeCardRepository(db_session),
+            ai_provider=InvalidAiProvider(),
+            settings=Settings(openai_api_key="test-key"),
+        )
+
+    app.dependency_overrides[get_answer_arena_service] = override_service
+
+    response = await client.post(
+        "/api/v1/answer-arena/score",
+        json={
+            "card_id": card.id,
+            "mode": "ai",
+            "user_answer": "This answer is long enough and includes a structured project example for scoring.",
+        },
+    )
+
+    assert response.status_code == 503
