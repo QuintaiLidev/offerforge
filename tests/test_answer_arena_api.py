@@ -143,6 +143,21 @@ class FakeAiProvider:
         )
 
 
+class FakeOpenRouterProvider:
+    def score(self, *, card: KnowledgeCard, user_answer: str) -> AnswerScoreResponse:
+        return AnswerScoreResponse(
+            provider="openrouter",
+            total_score=93,
+            dimension_scores={dimension: 9 for dimension in ANSWER_SCORE_DIMENSIONS},
+            strengths=["specific"],
+            problems=[],
+            risk_expressions=[],
+            suggestions=["keep it concise"],
+            optimized_answer_30s="OpenRouter optimized answer.",
+            memory_labels=["openrouter"],
+        )
+
+
 class TimeoutAiProvider:
     def score(self, *, card: KnowledgeCard, user_answer: str) -> AnswerScoreResponse:
         raise AiScoringTimeoutError("AI scoring provider timed out.")
@@ -224,6 +239,86 @@ async def test_score_api_ai_mode_without_key_returns_503(
     )
 
     assert response.status_code == 503
+
+
+async def test_score_api_openrouter_mode_without_key_returns_503(
+    client: httpx.AsyncClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OFFERFORGE_AI_SCORE_BACKEND", "openrouter")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    get_settings.cache_clear()
+    card = create_card(db_session)
+
+    response = await client.post(
+        "/api/v1/answer-arena/score",
+        json={
+            "card_id": card.id,
+            "mode": "ai",
+            "user_answer": "This answer is long enough and includes a structured project example for scoring.",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "OpenRouter API key is not configured."
+
+
+async def test_score_api_openrouter_mode_uses_mocked_provider_without_mutation(
+    client: httpx.AsyncClient,
+    db_session: Session,
+) -> None:
+    card = create_card(db_session)
+    before = {
+        "title": card.title,
+        "question": card.question,
+        "reference_answer": card.reference_answer,
+        "mastery_level": card.mastery_level,
+        "next_review_at": card.next_review_at,
+        "last_practiced_at": card.last_practiced_at,
+        "consecutive_correct_count": card.consecutive_correct_count,
+        "total_error_count": card.total_error_count,
+        "updated_at": card.updated_at,
+    }
+
+    def override_service() -> AnswerArenaService:
+        return AnswerArenaService(
+            KnowledgeCardRepository(db_session),
+            ai_provider=FakeOpenRouterProvider(),
+            settings=Settings(
+                ai_score_backend="openrouter",
+                openrouter_api_key="test-router-key",
+            ),
+        )
+
+    app.dependency_overrides[get_answer_arena_service] = override_service
+
+    response = await client.post(
+        "/api/v1/answer-arena/score",
+        json={
+            "card_id": card.id,
+            "mode": "ai",
+            "user_answer": "This answer is long enough and includes a structured project example for scoring.",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider"] == "openrouter"
+    assert data["total_score"] == 93
+    assert db_session.scalar(
+        select(PracticeAttempt).where(PracticeAttempt.knowledge_card_id == card.id)
+    ) is None
+    db_session.refresh(card)
+    assert card.title == before["title"]
+    assert card.question == before["question"]
+    assert card.reference_answer == before["reference_answer"]
+    assert card.mastery_level == before["mastery_level"]
+    assert card.next_review_at == before["next_review_at"]
+    assert card.last_practiced_at == before["last_practiced_at"]
+    assert card.consecutive_correct_count == before["consecutive_correct_count"]
+    assert card.total_error_count == before["total_error_count"]
+    assert card.updated_at == before["updated_at"]
 
 
 async def test_score_api_ai_timeout_returns_504(

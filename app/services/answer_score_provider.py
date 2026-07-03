@@ -79,6 +79,8 @@ class OpenAIAnswerScoreProvider:
         api_key: str,
         model: str,
         timeout_seconds: int,
+        base_url: str | None = None,
+        default_headers: dict[str, str] | None = None,
     ) -> None:
         try:
             from openai import (
@@ -103,7 +105,15 @@ class OpenAIAnswerScoreProvider:
         self._api_connection_error = APIConnectionError
         self._api_status_error = APIStatusError
         self._timeout_error = APITimeoutError
-        self._client = OpenAI(api_key=api_key, timeout=timeout_seconds)
+        client_kwargs: dict[str, Any] = {
+            "api_key": api_key,
+            "timeout": timeout_seconds,
+        }
+        if base_url is not None:
+            client_kwargs["base_url"] = base_url
+        if default_headers:
+            client_kwargs["default_headers"] = default_headers
+        self._client = OpenAI(**client_kwargs)
         self._model = model
 
     def score(
@@ -204,4 +214,32 @@ class OpenAIAnswerScoreProvider:
             f"Core knowledge: {card.core_knowledge}\n"
             f"Reference answer: {card.reference_answer}\n\n"
             f"User answer: {user_answer}"
+        )
+
+
+class OpenRouterAnswerScoreProvider(OpenAIAnswerScoreProvider):
+    provider_name = "openrouter"
+    base_url = "https://openrouter.ai/api/v1"
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        timeout_seconds: int,
+        site_url: str | None = None,
+        app_title: str | None = "OfferForge",
+    ) -> None:
+        headers: dict[str, str] = {}
+        if site_url:
+            headers["HTTP-Referer"] = site_url
+        if app_title:
+            headers["X-OpenRouter-Title"] = app_title
+
+        super().__init__(
+            api_key=api_key,
+            model=model,
+            timeout_seconds=timeout_seconds,
+            base_url=self.base_url,
+            default_headers=headers or None,
         )

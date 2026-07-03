@@ -15,8 +15,13 @@ def test_default_host_and_port_are_local_only() -> None:
     assert settings.auto_seed_on_startup is True
     assert settings.auto_seed_path == DEFAULT_AUTO_SEED_PATH
     assert settings.ai_score_provider == "rule"
+    assert settings.ai_score_backend == "openai"
     assert settings.openai_api_key is None
     assert settings.openai_model == "gpt-4o-mini"
+    assert settings.openrouter_api_key is None
+    assert settings.openrouter_model == "openai/gpt-4o-mini"
+    assert settings.openrouter_site_url is None
+    assert settings.openrouter_app_title == "OfferForge"
     assert settings.ai_score_timeout_seconds == 20
 
 
@@ -91,13 +96,23 @@ def test_ai_score_settings_can_be_loaded_from_environment() -> None:
     settings = load_settings(
         {
             "OFFERFORGE_AI_SCORE_PROVIDER": "ai",
+            "OFFERFORGE_AI_SCORE_BACKEND": "openrouter",
             "OPENAI_API_KEY": "test-openai-key",
             "OFFERFORGE_OPENAI_MODEL": "gpt-4o-mini-2026",
+            "OPENROUTER_API_KEY": "test-openrouter-key",
+            "OFFERFORGE_OPENROUTER_MODEL": "anthropic/claude-3.5-sonnet",
+            "OFFERFORGE_OPENROUTER_SITE_URL": "https://offerforge.example",
+            "OFFERFORGE_OPENROUTER_APP_TITLE": "OfferForge Test",
             "OFFERFORGE_AI_SCORE_TIMEOUT_SECONDS": "12",
         }
     )
 
     assert settings.ai_score_provider == "ai"
+    assert settings.ai_score_backend == "openrouter"
     assert settings.openai_api_key == "test-openai-key"
     assert settings.openai_model == "gpt-4o-mini-2026"
+    assert settings.openrouter_api_key == "test-openrouter-key"
+    assert settings.openrouter_model == "anthropic/claude-3.5-sonnet"
+    assert settings.openrouter_site_url == "https://offerforge.example"
+    assert settings.openrouter_app_title == "OfferForge Test"
     assert settings.ai_score_timeout_seconds == 12

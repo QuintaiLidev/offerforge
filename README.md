@@ -206,7 +206,7 @@ Bulk card import is available through `POST /api/v1/cards/bulk` with a JSON arra
 
 Practice history: `/app` can show recent practice attempts, including rating, user answer, card information, and next review time.
 Answer Arena V0.1: `/app` supports rule-based answer scoring before submitting a practice rating.
-Answer Arena V0.2: rule scoring remains the default; optional AI scoring uses `mode=ai` with `OFFERFORGE_AI_SCORE_PROVIDER`, `OPENAI_API_KEY`, `OFFERFORGE_OPENAI_MODEL`, and `OFFERFORGE_AI_SCORE_TIMEOUT_SECONDS`, and does not create attempts or change scheduling.
+Answer Arena V0.2: rule scoring remains the default; optional AI scoring uses `mode=ai` with `OFFERFORGE_AI_SCORE_BACKEND=openai|openrouter`. OpenAI uses `OPENAI_API_KEY`; OpenRouter uses `OPENROUTER_API_KEY`, `OFFERFORGE_OPENROUTER_MODEL`, optional `OFFERFORGE_OPENROUTER_SITE_URL`, and `OFFERFORGE_OPENROUTER_APP_TITLE`. Scores are not saved and scheduling is unchanged.
 
 Card editing: `/app` supports editing card title, question, core knowledge, reference answer, and tags.
 

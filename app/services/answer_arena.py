@@ -8,7 +8,10 @@ from app.models import KnowledgeCard
 from app.models.enums import KnowledgeCategory
 from app.repositories import KnowledgeCardRepository
 from app.schemas.answer_arena import ANSWER_SCORE_DIMENSIONS, AnswerScoreResponse
-from app.services.answer_score_provider import OpenAIAnswerScoreProvider
+from app.services.answer_score_provider import (
+    OpenAIAnswerScoreProvider,
+    OpenRouterAnswerScoreProvider,
+)
 from app.services.exceptions import (
     AiScoringUnavailableError,
     KnowledgeCardNotFoundError,
@@ -115,17 +118,32 @@ class AnswerArenaService:
         card: KnowledgeCard,
         user_answer: str,
     ) -> AnswerScoreResponse:
+        provider = self.ai_provider or self._build_ai_score_provider()
+        return provider.score(card=card, user_answer=user_answer)
+
+    def _build_ai_score_provider(self) -> AnswerScoreProvider:
+        if self.settings.ai_score_backend == "openrouter":
+            if not self.settings.openrouter_api_key:
+                raise AiScoringUnavailableError(
+                    "OpenRouter API key is not configured."
+                )
+            return OpenRouterAnswerScoreProvider(
+                api_key=self.settings.openrouter_api_key,
+                model=self.settings.openrouter_model,
+                timeout_seconds=self.settings.ai_score_timeout_seconds,
+                site_url=self.settings.openrouter_site_url,
+                app_title=self.settings.openrouter_app_title,
+            )
+
         if not self.settings.openai_api_key:
             raise AiScoringUnavailableError(
                 "OpenAI API key is not configured for AI scoring."
             )
-
-        provider = self.ai_provider or OpenAIAnswerScoreProvider(
+        return OpenAIAnswerScoreProvider(
             api_key=self.settings.openai_api_key,
             model=self.settings.openai_model,
             timeout_seconds=self.settings.ai_score_timeout_seconds,
         )
-        return provider.score(card=card, user_answer=user_answer)
 
     def _score_answer_with_rules(
         self,

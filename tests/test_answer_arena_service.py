@@ -7,6 +7,7 @@ from app.models.enums import KnowledgeCategory
 from app.repositories import KnowledgeCardRepository
 from app.schemas.answer_arena import ANSWER_SCORE_DIMENSIONS, AnswerScoreResponse
 from app.schemas.knowledge_card import KnowledgeCardCreate
+from app.services import answer_arena as answer_arena_module
 from app.services.answer_score_provider import (
     OpenAIAnswerScoreProvider,
     parse_ai_score_payload,
@@ -159,6 +160,110 @@ def test_service_rejects_ai_mode_without_openai_key(db_session) -> None:
             mode="ai",
             user_answer="This answer is long enough and structured for scoring.",
         )
+
+
+def test_service_uses_openrouter_backend(
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    card = create_card(
+        db_session,
+        title="OpenRouter scoring",
+        category=KnowledgeCategory.PROJECT_EXPLANATION,
+    )
+    captured: dict[str, object] = {}
+
+    class StubOpenRouterAnswerScoreProvider:
+        def __init__(
+            self,
+            *,
+            api_key: str,
+            model: str,
+            timeout_seconds: int,
+            site_url: str | None,
+            app_title: str | None,
+        ) -> None:
+            captured.update(
+                {
+                    "api_key": api_key,
+                    "model": model,
+                    "timeout_seconds": timeout_seconds,
+                    "site_url": site_url,
+                    "app_title": app_title,
+                }
+            )
+
+        def score(self, *, card, user_answer: str) -> AnswerScoreResponse:
+            captured["card_id"] = card.id
+            captured["user_answer"] = user_answer
+            return AnswerScoreResponse(
+                provider="openrouter",
+                total_score=86,
+                dimension_scores={
+                    dimension: 8 for dimension in ANSWER_SCORE_DIMENSIONS
+                },
+                strengths=["clear"],
+                problems=[],
+                risk_expressions=[],
+                suggestions=["add one example"],
+                optimized_answer_30s="OpenRouter optimized answer.",
+                memory_labels=["openrouter"],
+            )
+
+    monkeypatch.setattr(
+        answer_arena_module,
+        "OpenRouterAnswerScoreProvider",
+        StubOpenRouterAnswerScoreProvider,
+    )
+    service = AnswerArenaService(
+        KnowledgeCardRepository(db_session),
+        settings=Settings(
+            ai_score_backend="openrouter",
+            openrouter_api_key="router-key",
+            openrouter_model="openrouter/model",
+            openrouter_site_url="https://offerforge.example",
+            openrouter_app_title="OfferForge Test",
+            ai_score_timeout_seconds=15,
+        ),
+    )
+
+    result = service.score_answer(
+        card_id=card.id,
+        mode="ai",
+        user_answer="This answer is long enough for OpenRouter scoring.",
+    )
+
+    assert result.provider == "openrouter"
+    assert captured == {
+        "api_key": "router-key",
+        "model": "openrouter/model",
+        "timeout_seconds": 15,
+        "site_url": "https://offerforge.example",
+        "app_title": "OfferForge Test",
+        "card_id": card.id,
+        "user_answer": "This answer is long enough for OpenRouter scoring.",
+    }
+
+
+def test_service_rejects_openrouter_backend_without_key(db_session) -> None:
+    card = create_card(
+        db_session,
+        title="OpenRouter missing key",
+        category=KnowledgeCategory.PROJECT_EXPLANATION,
+    )
+    service = AnswerArenaService(
+        KnowledgeCardRepository(db_session),
+        settings=Settings(ai_score_backend="openrouter", openrouter_api_key=None),
+    )
+
+    with pytest.raises(AiScoringUnavailableError) as exc:
+        service.score_answer(
+            card_id=card.id,
+            mode="ai",
+            user_answer="This answer is long enough and structured for scoring.",
+        )
+
+    assert str(exc.value) == "OpenRouter API key is not configured."
 
 
 def test_ai_score_payload_parser_rejects_missing_dimensions() -> None:

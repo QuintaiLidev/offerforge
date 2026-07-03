@@ -30,8 +30,13 @@ class Settings(BaseModel):
     auto_seed_on_startup: bool = True
     auto_seed_path: Path = DEFAULT_AUTO_SEED_PATH
     ai_score_provider: str = "rule"
+    ai_score_backend: str = "openai"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    openrouter_api_key: str | None = None
+    openrouter_model: str = "openai/gpt-4o-mini"
+    openrouter_site_url: str | None = None
+    openrouter_app_title: str = "OfferForge"
     ai_score_timeout_seconds: int = 20
 
     @field_validator("database_path", mode="after")
@@ -76,9 +81,32 @@ class Settings(BaseModel):
             raise ValueError("OFFERFORGE_AI_SCORE_PROVIDER must be rule or ai.")
         return normalized
 
+    @field_validator("ai_score_backend", mode="before")
+    @classmethod
+    def normalize_ai_score_backend(cls, value: object) -> object:
+        if value is None:
+            return "openai"
+        if not isinstance(value, str):
+            return value
+
+        normalized = value.strip().lower()
+        if normalized not in {"openai", "openrouter"}:
+            raise ValueError("OFFERFORGE_AI_SCORE_BACKEND must be openai or openrouter.")
+        return normalized
+
     @field_validator("openai_api_key", mode="before")
     @classmethod
     def normalize_openai_api_key(cls, value: object) -> object:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            return value
+        stripped = value.strip()
+        return stripped or None
+
+    @field_validator("openrouter_api_key", "openrouter_site_url", mode="before")
+    @classmethod
+    def normalize_optional_openrouter_string(cls, value: object) -> object:
         if value is None:
             return None
         if not isinstance(value, str):
@@ -95,6 +123,26 @@ class Settings(BaseModel):
             return value
         stripped = value.strip()
         return stripped or "gpt-4o-mini"
+
+    @field_validator("openrouter_model", mode="before")
+    @classmethod
+    def normalize_openrouter_model(cls, value: object) -> object:
+        if value is None:
+            return "openai/gpt-4o-mini"
+        if not isinstance(value, str):
+            return value
+        stripped = value.strip()
+        return stripped or "openai/gpt-4o-mini"
+
+    @field_validator("openrouter_app_title", mode="before")
+    @classmethod
+    def normalize_openrouter_app_title(cls, value: object) -> object:
+        if value is None:
+            return "OfferForge"
+        if not isinstance(value, str):
+            return value
+        stripped = value.strip()
+        return stripped
 
     @field_validator("ai_score_timeout_seconds")
     @classmethod
@@ -167,8 +215,19 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
             env.get("OFFERFORGE_AUTO_SEED_PATH", str(DEFAULT_AUTO_SEED_PATH))
         ),
         ai_score_provider=env.get("OFFERFORGE_AI_SCORE_PROVIDER", "rule"),
+        ai_score_backend=env.get("OFFERFORGE_AI_SCORE_BACKEND", "openai"),
         openai_api_key=env.get("OPENAI_API_KEY") or None,
         openai_model=env.get("OFFERFORGE_OPENAI_MODEL", "gpt-4o-mini"),
+        openrouter_api_key=env.get("OPENROUTER_API_KEY") or None,
+        openrouter_model=env.get(
+            "OFFERFORGE_OPENROUTER_MODEL",
+            "openai/gpt-4o-mini",
+        ),
+        openrouter_site_url=env.get("OFFERFORGE_OPENROUTER_SITE_URL") or None,
+        openrouter_app_title=env.get(
+            "OFFERFORGE_OPENROUTER_APP_TITLE",
+            "OfferForge",
+        ),
         ai_score_timeout_seconds=_read_int(
             env.get("OFFERFORGE_AI_SCORE_TIMEOUT_SECONDS"),
             20,
