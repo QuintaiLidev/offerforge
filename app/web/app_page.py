@@ -780,21 +780,30 @@ APP_HTML = """<!doctype html>
     }
 
     async function fetchJson(url, options = {}) {
+      const {timeoutMs = 15000, ...fetchOptions} = options;
       const headers = {
         Accept: "application/json",
-        ...(options.headers || {}),
+        ...(fetchOptions.headers || {}),
       };
-      const method = options.method || "GET";
+      const method = fetchOptions.method || "GET";
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
       let response;
       try {
         response = await fetch(url, {
-          ...options,
+          ...fetchOptions,
           headers,
           credentials: "same-origin",
+          signal: controller.signal,
         });
       } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          throw new Error(`${method} ${url} request timed out after ${timeoutMs / 1000}s`);
+        }
         const detail = error instanceof Error ? error.message : String(error);
         throw new Error(`${method} ${url} request failed: ${detail}`);
+      } finally {
+        window.clearTimeout(timeoutId);
       }
       if (!response.ok) {
         let message = `${response.status} ${response.statusText}`;
@@ -820,12 +829,12 @@ APP_HTML = """<!doctype html>
       elements.cardPanel.classList.add("hidden");
       elements.modeText.classList.add("hidden");
       setButtonsDisabled(true);
-      if (mode === "ai") {
-        elements.scoreAnswerButton.textContent = "规则评分";
-      }
 
       try {
-        const today = await fetchJson("/api/v1/reviews/today?limit=10");
+        const today = await fetchJson(
+          "/api/v1/reviews/today?limit=10",
+          {timeoutMs: 15000}
+        );
         elements.modeText.textContent = `mode: ${today.mode}`;
         elements.modeText.classList.remove("hidden");
 
@@ -837,7 +846,10 @@ APP_HTML = """<!doctype html>
         }
 
         const summary = today.items[0];
-        const detail = await fetchJson(`/api/v1/cards/${summary.id}`);
+        const detail = await fetchJson(
+          `/api/v1/cards/${summary.id}`,
+          {timeoutMs: 15000}
+        );
         renderCard(detail);
       } catch (error) {
         showError(`加载失败：${error.message}`);
@@ -1275,6 +1287,7 @@ APP_HTML = """<!doctype html>
       try {
         const score = await fetchJson("/api/v1/answer-arena/score", {
           method: "POST",
+          timeoutMs: mode === "ai" ? 30000 : 15000,
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({
             card_id: state.currentCard.id,
