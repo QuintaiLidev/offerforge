@@ -1,0 +1,272 @@
+[
+  {
+    "title": "Cursor 你用过吗？",
+    "category": "project_explanation",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "AI 工具要表达为提效和辅助理解，不能说成替代个人编码与判断。",
+    "question": "Cursor 你用过吗？在实际工作或学习里怎么用？",
+    "reference_answer": "【30秒口述版】用过，我把 Cursor 定位成提升阅读、整理和生成草稿效率的工具，不把它当成替代自己判断的工具。\n【展开回答】两个要点：第一，用它辅助理解代码结构、生成测试脚本初稿和整理检查清单；第二，所有输出都要回到需求、代码和测试结果验证。比如我会让它帮我拆接口用例或解释报错，但最终断言、边界和风险点由我确认。\n【记忆标签】工具辅助、人工把关、结果验证\n【风险表达提醒】不要说“AI 写了大部分代码”或暗示离开工具就不能工作。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "ai_tools",
+      "cursor",
+      "productivity"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "你怎么理解 Skills？",
+    "category": "project_explanation",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "Skills 可以理解为把稳定工作流、上下文和规范沉淀成可复用能力包。",
+    "question": "你怎么理解 Skills？它和普通提示词有什么区别？",
+    "reference_answer": "【30秒口述版】我理解 Skills 是把可复用的工作方法沉淀成标准能力包，让 AI 按固定上下文、步骤和约束执行。\n【展开回答】普通提示词更像一次性指令，Skills 更强调稳定流程。两个要点：一是把输入格式、检查步骤、输出规范固化；二是降低重复沟通成本。比如测试复盘可以沉淀成“问题背景、风险点、口述答案、追问防守”的结构，后续面试题都按同一套方式产出。\n【记忆标签】流程沉淀、上下文复用、输出规范\n【风险表达提醒】不要把 Skills 说成神秘能力，也不要说它能自动替代专业判断。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "ai_tools",
+      "skills",
+      "workflow"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "AI 在测试领域怎么用？",
+    "category": "project_explanation",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "AI 在测试中适合辅助用例设计、脚本草稿、日志分析和文档总结，但结论要由人校验。",
+    "question": "AI 在测试领域怎么用？你会落在哪些场景？",
+    "reference_answer": "【30秒口述版】AI 在测试领域主要用于提效：辅助用例设计、接口脚本草稿、日志分析和测试文档整理，但测试结论必须由人确认。\n【展开回答】两个要点：第一，AI 适合处理重复和文本类工作，比如根据需求列边界值、整理异常场景；第二，关键质量判断仍要靠业务理解、数据校验和实际执行结果。例子是权限矩阵测试，AI 可以帮我列角色组合，但我会结合真实菜单、接口权限和数据库结果做核对。\n【记忆标签】提效不替代、场景化使用、人负责结论\n【风险表达提醒】不要夸大为“AI 能自动完成测试”，也不要忽略误判和遗漏风险。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "ai_tools",
+      "testing",
+      "quality"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "AI 写的代码你怎么保证质量？",
+    "category": "project_explanation",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "AI 生成代码必须经过需求核对、人工审查、自动化测试和小步验证。",
+    "question": "AI 写的代码你怎么保证质量？",
+    "reference_answer": "【30秒口述版】我会把 AI 写的代码当作草稿，经过人工审查、测试验证和小步提交后才使用。\n【展开回答】两个要点：第一，先核对代码是否符合需求、项目规范和边界条件；第二，用单元测试、接口测试或本地运行验证行为。比如生成接口自动化脚本后，我会检查参数化数据、断言是否只判断状态码、异常分支是否覆盖，再接入 CI 或定期执行。\n【记忆标签】草稿心态、人工审查、测试兜底\n【风险表达提醒】不要说“AI 写了 80% 所以效率很高”，应强调质量门禁。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "ai_code",
+      "code_review",
+      "quality_gate"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "离开 AI 后，你怎么独立定位问题？",
+    "category": "real_business_case",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "独立定位能力要体现为复现、缩小范围、看日志数据、验证假设和沉淀结论。",
+    "question": "如果不用 AI，你怎么独立定位一个问题？",
+    "reference_answer": "【30秒口述版】离开 AI 后我会按复现、分层、证据和验证假设的方式定位问题。\n【展开回答】两个要点：第一，先稳定复现并记录输入、账号角色、环境和时间点；第二，按前端、接口、服务日志、数据库和配置逐层缩小范围。比如权限问题，我会对比页面按钮、接口返回、角色配置和数据范围，确认是前端展示、后端鉴权还是基础数据问题。\n【记忆标签】先复现、再分层、用证据闭环\n【风险表达提醒】不要把回答说成“我会问 AI”或只说看日志，要讲清定位路径。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "debugging",
+      "independent_analysis",
+      "troubleshooting"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "UI 自动化是怎么做的？",
+    "category": "selenium",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "UI 自动化要从场景分层、元素定位、等待机制、断言和稳定性维护来讲。",
+    "question": "UI 自动化是怎么做的？你负责哪些环节？",
+    "reference_answer": "【30秒口述版】UI 自动化我会先选稳定高价值流程，再做脚本封装、等待处理、断言补充和持续维护。\n【展开回答】两个要点：第一，不是简单录制脚本，而是把登录、菜单跳转、页面对象、测试数据做复用；第二，稳定性靠显式等待、可靠定位、截图日志和失败重跑分析。比如银行后台流程，我会优先覆盖登录、权限菜单、关键查询和提交流程，并校验页面提示与接口或数据结果一致。\n【记忆标签】高价值流程、稳定定位、断言维护\n【风险表达提醒】不要只说“录制脚本、改 XPath”，这会显得自动化深度不足。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "ui_automation",
+      "selenium",
+      "stability"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "这个 UI 自动化工具是外采还是自研？",
+    "category": "selenium",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "外采或自研都要说明自己的真实职责，重点讲如何使用、适配和维护质量。",
+    "question": "你们 UI 自动化工具是外采还是自研？你在里面做了什么？",
+    "reference_answer": "【30秒口述版】如果工具是外采，我会如实说明，同时强调我负责落地使用、脚本维护和场景适配；如果有自研部分，也只说自己实际参与的模块。\n【展开回答】两个要点：第一，外采不代表没有技术含量，关键在于能否结合业务稳定运行；第二，我会补充定位优化、等待策略、数据准备和失败分析。比如工具提供录制能力，我会在录制后重构定位、补断言、处理环境差异，并输出可重复执行的用例集。\n【记忆标签】如实边界、落地适配、质量维护\n【风险表达提醒】不要把外采包装成完全自研，也不要把自己的职责说得过小。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "ui_automation",
+      "tooling",
+      "ownership"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "元素定位不稳定怎么办？",
+    "category": "selenium",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "元素定位不稳定要优先优化定位策略、等待条件和页面状态，而不是只改 XPath。",
+    "question": "元素定位不稳定怎么办？",
+    "reference_answer": "【30秒口述版】元素定位不稳定时，我会优先提升定位策略和页面同步，而不是反复硬改 XPath。\n【展开回答】两个要点：第一，优先使用稳定属性、业务含义、相对定位或封装页面对象，减少依赖层级路径；第二，配合显式等待、加载完成判断和失败截图日志。比如动态列表按钮，我会先锁定行内唯一文本，再定位同一行操作按钮，并等待元素可点击后再执行。\n【记忆标签】稳定属性、相对定位、显式等待\n【风险表达提醒】不要只回答“换 XPath”或“加 sleep”，sleep 只能临时缓解。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "locator",
+      "xpath",
+      "waits"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "权限矩阵怎么测？",
+    "category": "real_business_case",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "权限矩阵测试要覆盖角色、资源、操作、数据范围和越权风险。",
+    "question": "权限矩阵怎么测？如何避免漏测？",
+    "reference_answer": "【30秒口述版】权限矩阵我会按角色、资源、操作、数据范围四个维度建表，再覆盖正向授权和反向越权。\n【展开回答】两个要点：第一，每个角色要验证可见、可操作、不可见和不可操作；第二，要同时检查前端菜单、接口鉴权和数据口径。比如客户经理只能看自己客户，主管能看团队客户，我会准备不同归属数据，用页面和接口分别验证查询、导出、修改等动作。\n【记忆标签】角色资源操作数据、正反都测、前后端一致\n【风险表达提醒】不要只说点页面菜单，权限问题最怕接口绕过和数据越权。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "permission_matrix",
+      "business_testing",
+      "authorization"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "你现在是驻场银行吗？",
+    "category": "hr_interview",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "驻场经历不要弱化，要强调复杂业务、合规流程、跨团队协作和上线保障。",
+    "question": "你现在是驻场银行吗？这段经历怎么介绍？",
+    "reference_answer": "【30秒口述版】是驻场银行相关项目，我会把它理解为复杂业务场景下的质量保障经历，而不是简单外包执行。\n【展开回答】两个要点：第一，银行项目对权限、数据口径、流程审批和上线稳定性要求高；第二，驻场需要和业务、开发、产品、运维沟通，推动问题闭环。比如权限矩阵、客户数据、营销统计这类功能，我会关注口径一致、越权风险和上线回归。\n【记忆标签】复杂业务、合规流程、跨团队闭环\n【风险表达提醒】不要弱化为“只是驻场”，也不要虚构自己拥有最终业务决策权。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "onsite",
+      "banking",
+      "hr_interview"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "你以后是想做 Python 自动化吗？",
+    "category": "hr_interview",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "职业方向应表述为测试开发、技术化质量保障和工具化提效，而不是单一语言岗位。",
+    "question": "你以后是想做 Python 自动化吗？",
+    "reference_answer": "【30秒口述版】我的方向不是只做 Python 自动化，而是测试开发和技术化质量保障，Python 是我落地工具化提效的一种手段。\n【展开回答】两个要点：第一，我希望用自动化、脚本、平台工具提升测试效率和稳定性；第二，我也会继续补业务理解、接口、数据和工程化能力。比如接口自动化、UI 稳定性治理、数据校验脚本都可以用 Python 落地，但目标是解决质量问题。\n【记忆标签】方向是测试开发、语言是工具、目标是质量提效\n【风险表达提醒】不要把职业规划说窄成“只想写 Python 脚本”。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "career_direction",
+      "sdet",
+      "hr_interview"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "接口自动化怎么做？",
+    "category": "http_api_testing",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "接口自动化要覆盖分层设计、数据准备、断言、环境配置和持续执行。",
+    "question": "接口自动化怎么做？你会如何落地？",
+    "reference_answer": "【30秒口述版】接口自动化我会从接口分层、数据准备、断言设计、环境配置和持续执行五个方面落地。\n【展开回答】两个要点：第一，按业务链路和接口优先级选择用例，封装请求、鉴权、配置和公共断言；第二，断言不能只看状态码，还要看业务码、关键字段、数据库或后续接口结果。比如创建客户后，我会校验响应、查询接口、权限角色下的数据可见性。\n【记忆标签】分层封装、数据驱动、业务断言\n【风险表达提醒】不要只说 Postman 或只说状态码，面试官更关注可维护性。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "api_testing",
+      "automation",
+      "pytest"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "如果岗位偏软件和算法 / 图像处理，你怎么胜任？",
+    "category": "hr_interview",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "岗位匹配要承认算法深度边界，同时强调软件测试、数据验证、工具链和学习计划。",
+    "question": "如果岗位偏软件和算法 / 图像处理，你怎么胜任？",
+    "reference_answer": "【30秒口述版】如果岗位偏软件和算法或图像处理，我会如实说明算法不是我最深的方向，但我能从软件质量、数据验证和工具化测试切入。\n【展开回答】两个要点：第一，我可以负责需求理解、测试设计、接口和流程质量保障；第二，我会补图像处理基础、评价指标和样本数据分析。比如图像类功能，我会关注输入样本覆盖、边界图片、结果一致性、性能和误识别案例沉淀。\n【记忆标签】承认边界、质量切入、快速补齐\n【风险表达提醒】不要假装有很深算法经验，要强调可迁移能力和学习计划。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "role_fit",
+      "image_processing",
+      "learning_plan"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "这个岗位是不是端口负责人？你怎么理解？",
+    "category": "real_business_case",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "端口负责人重点是对模块质量闭环负责，包括需求澄清、风险识别、进度同步和上线结果。",
+    "question": "这个岗位是不是端口负责人？你怎么理解端口负责人？",
+    "reference_answer": "【30秒口述版】我理解端口负责人是对一个模块或业务口的质量闭环负责，不只是执行用例。\n【展开回答】两个要点：第一，要提前参与需求澄清、风险识别、测试计划和进度同步；第二，要推动缺陷修复、回归验证和上线风险确认。比如负责权限端口，就要维护权限矩阵、典型角色数据、接口校验和上线前回归清单。\n【记忆标签】模块闭环、风险前置、上线负责\n【风险表达提醒】不要把负责人理解成管理头衔，也不要承诺超出岗位权限的决策。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "module_owner",
+      "responsibility",
+      "business_case"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  },
+  {
+    "title": "入职前三个月你会怎么做？",
+    "category": "hr_interview",
+    "difficulty": "medium",
+    "question_type": "subjective",
+    "core_knowledge": "前三个月计划要体现快速熟悉业务、补齐技术、交付小成果和建立协作节奏。",
+    "question": "入职前三个月你会怎么做？",
+    "reference_answer": "【30秒口述版】前三个月我会按熟悉业务、稳定交付、工具化改进三个阶段推进。\n【展开回答】第一个月重点熟悉产品、流程、环境、缺陷规范和核心业务链路；第二个月独立承担模块测试，补齐接口、日志、数据口径和自动化规范；第三个月尝试沉淀可复用资产，比如冒烟清单、接口用例、权限矩阵或小工具。收尾目标是先可靠交付，再逐步提效。\n【记忆标签】先融入、再交付、后提效\n【风险表达提醒】不要一上来就说大改平台或重构流程，要体现务实落地。",
+    "scoring_rules": {},
+    "tags": [
+      "smartmore_interview",
+      "real_interview",
+      "onboarding",
+      "career_plan",
+      "execution"
+    ],
+    "source_reference": "interview-smartmore-v1"
+  }
+]

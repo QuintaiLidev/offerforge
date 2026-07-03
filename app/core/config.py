@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Mapping
+from typing import Literal, Mapping
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -29,6 +29,10 @@ class Settings(BaseModel):
     auth_password: str | None = None
     auto_seed_on_startup: bool = True
     auto_seed_path: Path = DEFAULT_AUTO_SEED_PATH
+    ai_score_provider: Literal["rule", "openai"] = "rule"
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
+    ai_score_timeout_seconds: int = 20
 
     @field_validator("database_path", mode="after")
     @classmethod
@@ -51,6 +55,13 @@ class Settings(BaseModel):
         if stripped.startswith("postgres://"):
             return "postgresql://" + stripped[len("postgres://") :]
         return stripped
+
+    @field_validator("openai_api_key", mode="before")
+    @classmethod
+    def normalize_openai_api_key(cls, value: object) -> object:
+        if value is None or not isinstance(value, str):
+            return value
+        return value.strip() or None
 
     @field_validator("auto_seed_path", mode="after")
     @classmethod
@@ -121,6 +132,13 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         ),
         auto_seed_path=Path(
             env.get("OFFERFORGE_AUTO_SEED_PATH", str(DEFAULT_AUTO_SEED_PATH))
+        ),
+        ai_score_provider=env.get("OFFERFORGE_AI_SCORE_PROVIDER", "rule"),
+        openai_api_key=env.get("OPENAI_API_KEY") or None,
+        openai_model=env.get("OFFERFORGE_OPENAI_MODEL", "gpt-4o-mini"),
+        ai_score_timeout_seconds=_read_int(
+            env.get("OFFERFORGE_AI_SCORE_TIMEOUT_SECONDS"),
+            20,
         ),
     )
 
