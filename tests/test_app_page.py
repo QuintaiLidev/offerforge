@@ -60,6 +60,13 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "请至少输入 30 字回答后再评分" in response.text
     assert "AbortController" in response.text
     assert "timeoutMs" in response.text
+    assert "90000" in response.text
+    assert "AI评分中，完整答案可能需要 30-90 秒..." in response.text
+    assert "AI评分超时：完整答案生成较慢，请稍后重试或换稳定网络。" in response.text
+    assert "AI评分请求失败：网络连接中断或服务暂时不可用，请稍后重试。" in response.text
+    assert "formatScoreFailureMessage" in response.text
+    assert "Load failed" in response.text
+    assert "TypeError" in response.text
     assert "request timed out after" in response.text
     assert "window.clearTimeout(timeoutId)" in response.text
     assert "setLoading(false)" in response.text
@@ -71,10 +78,12 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "60秒面试口述版" in response.text
     assert "30秒精简版" in response.text
     assert "面试官可能追问" in response.text
+    assert "面试官追问与简短回答" in response.text
     assert "下一步练习建议" in response.text
     assert "score-example-pre" in response.text
     assert "createOptionalScoreBlock" in response.text
     assert "interview_answer_30s" in response.text
+    assert "follow_up_qas" in response.text
     assert "optimized_answer_30s" in response.text
     assert "/api/v1/answer-arena/score" in response.text
     assert "renderScoreResult" in response.text

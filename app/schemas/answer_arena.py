@@ -44,4 +44,5 @@ class AnswerScoreResponse(SchemaModel):
     interview_answer_60s: str | None = None
     interview_answer_30s: str | None = None
     follow_up_questions: list[str] = Field(default_factory=list)
+    follow_up_qas: list[str] = Field(default_factory=list)
     next_practice_step: str | None = None

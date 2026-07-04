@@ -14,30 +14,98 @@ from app.services.exceptions import (
 )
 
 
-def _require_text_list(payload: dict[str, Any], field_name: str) -> list[str]:
-    value = payload.get(field_name)
-    if not isinstance(value, list) or not all(
-        isinstance(item, str) for item in value
-    ):
-        raise AiScoringInvalidResponseError(
-            f"AI scoring response field '{field_name}' must be a list of strings."
-        )
-    return value
+TEXT_KEYS = ("text", "content", "value", "answer", "description")
+QUESTION_KEYS = ("question", "q")
+ANSWER_KEYS = ("answer", "a")
 
 
-def _optional_text_list(payload: dict[str, Any], field_name: str) -> list[str]:
-    value = payload.get(field_name)
-    if not isinstance(value, list):
+def _dump_json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _first_text_value(value: dict[str, Any], keys: tuple[str, ...]) -> str:
+    for key in keys:
+        if key in value:
+            text = _coerce_text(value[key])
+            if text:
+                return text
+    return ""
+
+
+def _coerce_qa_text(value: dict[str, Any]) -> str:
+    question = _first_text_value(value, QUESTION_KEYS)
+    answer = _first_text_value(value, ANSWER_KEYS)
+    if question and answer:
+        return f"Q：{question}\nA：{answer}"
+    if question:
+        return f"Q：{question}"
+    if answer:
+        return f"A：{answer}"
+    return ""
+
+
+def _coerce_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    if isinstance(value, list):
+        return "\n".join(
+            text for item in value if (text := _coerce_text(item))
+        ).strip()
+    if isinstance(value, dict):
+        qa_text = _coerce_qa_text(value)
+        if qa_text:
+            return qa_text
+        for key in TEXT_KEYS:
+            if key in value:
+                text = _coerce_text(value[key])
+                if text:
+                    return text
+        return _dump_json(value)
+    return str(value).strip()
+
+
+def _coerce_text_list_value(value: Any) -> list[str]:
+    if value is None:
         return []
-    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+    if isinstance(value, list):
+        return [
+            text for item in value if (text := _coerce_text(item))
+        ]
+    if isinstance(value, dict):
+        if "value" in value:
+            nested = value["value"]
+            if isinstance(nested, list):
+                return _coerce_text_list_value(nested)
+            text = _coerce_text(nested)
+            return [text] if text else []
+        text = _coerce_text(value)
+        return [text] if text else []
+    text = _coerce_text(value)
+    return [text] if text else []
 
 
-def _optional_text(payload: dict[str, Any], field_name: str) -> str | None:
-    value = payload.get(field_name)
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    return stripped or None
+def _coerce_text_list(payload: dict[str, Any], field_name: str) -> list[str]:
+    return _coerce_text_list_value(payload.get(field_name))
+
+
+def _coerce_text_field(payload: dict[str, Any], field_name: str) -> str:
+    return _coerce_text(payload.get(field_name))
+
+
+def _coerce_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if number != number:
+        return default
+    return max(minimum, min(maximum, int(round(number))))
 
 
 def parse_ai_score_payload(
@@ -47,44 +115,41 @@ def parse_ai_score_payload(
 ) -> AnswerScoreResponse:
     dimension_scores = payload.get("dimension_scores")
     if not isinstance(dimension_scores, dict):
-        raise AiScoringInvalidResponseError(
-            "AI scoring response must include dimension_scores."
-        )
+        dimension_scores = {}
 
     normalized_scores: dict[str, int] = {}
     for dimension in ANSWER_SCORE_DIMENSIONS:
-        value = dimension_scores.get(dimension)
-        if not isinstance(value, int) or not 0 <= value <= 10:
-            raise AiScoringInvalidResponseError(
-                "AI scoring response dimension_scores must include "
-                f"integer 0-10 values for '{dimension}'."
-            )
-        normalized_scores[dimension] = value
-
-    optimized_answer = payload.get("optimized_answer_30s")
-    if not isinstance(optimized_answer, str) or not optimized_answer.strip():
-        raise AiScoringInvalidResponseError(
-            "AI scoring response must include optimized_answer_30s."
+        normalized_scores[dimension] = _coerce_int(
+            dimension_scores.get(dimension),
+            default=0,
+            minimum=0,
+            maximum=10,
         )
 
     try:
         return AnswerScoreResponse(
             provider=provider,
-            total_score=payload.get("total_score"),
+            total_score=_coerce_int(
+                payload.get("total_score"),
+                default=0,
+                minimum=0,
+                maximum=100,
+            ),
             dimension_scores=normalized_scores,
-            strengths=_require_text_list(payload, "strengths"),
-            problems=_require_text_list(payload, "problems"),
-            risk_expressions=_require_text_list(payload, "risk_expressions"),
-            suggestions=_require_text_list(payload, "suggestions"),
-            optimized_answer_30s=optimized_answer,
-            memory_labels=_require_text_list(payload, "memory_labels"),
-            missing_points=_optional_text_list(payload, "missing_points"),
-            complete_answer=_optional_text(payload, "complete_answer"),
-            concrete_examples=_optional_text_list(payload, "concrete_examples"),
-            interview_answer_60s=_optional_text(payload, "interview_answer_60s"),
-            interview_answer_30s=_optional_text(payload, "interview_answer_30s"),
-            follow_up_questions=_optional_text_list(payload, "follow_up_questions"),
-            next_practice_step=_optional_text(payload, "next_practice_step"),
+            strengths=_coerce_text_list(payload, "strengths"),
+            problems=_coerce_text_list(payload, "problems"),
+            risk_expressions=_coerce_text_list(payload, "risk_expressions"),
+            suggestions=_coerce_text_list(payload, "suggestions"),
+            optimized_answer_30s=_coerce_text_field(payload, "optimized_answer_30s"),
+            memory_labels=_coerce_text_list(payload, "memory_labels"),
+            missing_points=_coerce_text_list(payload, "missing_points"),
+            complete_answer=_coerce_text_field(payload, "complete_answer"),
+            concrete_examples=_coerce_text_list(payload, "concrete_examples"),
+            interview_answer_60s=_coerce_text_field(payload, "interview_answer_60s"),
+            interview_answer_30s=_coerce_text_field(payload, "interview_answer_30s"),
+            follow_up_questions=_coerce_text_list(payload, "follow_up_questions"),
+            follow_up_qas=_coerce_text_list(payload, "follow_up_qas"),
+            next_practice_step=_coerce_text_field(payload, "next_practice_step"),
         )
     except ValidationError as exc:
         raise AiScoringInvalidResponseError(
@@ -236,22 +301,26 @@ class OpenAIAnswerScoreProvider:
             "dimension_scores, strengths, problems, risk_expressions, suggestions, "
             "optimized_answer_30s, memory_labels, missing_points, complete_answer, "
             "concrete_examples, interview_answer_60s, interview_answer_30s, "
-            "follow_up_questions, next_practice_step.\n"
+            "follow_up_questions, follow_up_qas, next_practice_step.\n"
+            "Use string arrays for strengths, problems, risk_expressions, "
+            "suggestions, memory_labels, missing_points, concrete_examples, "
+            "follow_up_questions, and follow_up_qas.\n"
             "New coaching fields must follow these rules:\n"
             "- missing_points: list the user's most specific gaps.\n"
-            "- complete_answer: give a full reference answer, not an outline. "
-            "Technical answers should be at least 150 Chinese characters; project "
-            "answers should be at least 180 Chinese characters; HR answers need a "
-            "clear structure.\n"
-            "- concrete_examples: provide 1-2 concrete examples. Technical topics "
+            "- complete_answer: give a full reference answer, not an outline, "
+            "controlled to 180-350 Chinese characters.\n"
+            "- concrete_examples: provide 1-2 key concrete examples. Technical topics "
             "must include code, SQL, CSS Selector, XPath, HTTP request, logs, test "
             "cases, pytest example, or CI pipeline where relevant.\n"
             "- interview_answer_60s: a natural one-minute answer the user can say "
             "out loud, following conclusion -> concept -> example -> project link "
-            "-> risk boundary -> summary.\n"
+            "-> risk boundary -> summary. Keep it 180-260 Chinese characters.\n"
             "- interview_answer_30s: concise spoken answer under 120 Chinese "
-            "characters when possible.\n"
-            "- follow_up_questions: 3 to 5 concrete interviewer follow-up questions.\n"
+            "characters when possible, ideally 80-120 Chinese characters.\n"
+            "- follow_up_questions: exactly 3 concrete interviewer follow-up questions.\n"
+            "- follow_up_qas: exactly 3 strings. Each string must contain one Q and "
+            "one A. Format: Q：question\\nA：60-120 Chinese character answer. The "
+            "answer must be specific and directly speakable.\n"
             "- next_practice_step: one specific next exercise action.\n\n"
             "题型专项规则：\n"
             "1. Python题：必须给 Python 代码例子。\n"

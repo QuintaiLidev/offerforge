@@ -148,6 +148,9 @@ class FakeAiProvider:
             interview_answer_60s="我会先说明结论，再讲接口、数据和项目落点，最后补充风险边界。",
             interview_answer_30s="接口自动化要验证响应、数据库和业务状态，并说明风险边界。",
             follow_up_questions=["你怎么做数据库断言？", "接口失败怎么定位？"],
+            follow_up_qas=[
+                "Q：你怎么做数据库断言？\nA：我会先拿业务唯一标识查库，再核对状态、数量和关键字段。"
+            ],
             next_practice_step="下次用 login -> create_user -> db assert 讲一遍项目链路。",
         )
 
@@ -170,6 +173,9 @@ class FakeOpenRouterProvider:
             interview_answer_60s="我会用一分钟讲清目标、实现、验证和风险边界。",
             interview_answer_30s="用项目链路说明测试开发能力，重点讲验证闭环。",
             follow_up_questions=["这个项目怎么证明不是玩具？"],
+            follow_up_qas=[
+                "Q：这个项目怎么证明不是玩具？\nA：我会从可运行、可测试、可复盘三个点说明。"
+            ],
             next_practice_step="下次用 30 秒讲清 SQL 断言层。",
         )
 
@@ -237,6 +243,7 @@ async def test_score_api_ai_mode_uses_mocked_provider(
     assert data["interview_answer_60s"].startswith("我会先说明结论")
     assert data["interview_answer_30s"].startswith("接口自动化")
     assert data["follow_up_questions"] == ["你怎么做数据库断言？", "接口失败怎么定位？"]
+    assert data["follow_up_qas"][0].startswith("Q：你怎么做数据库断言")
     assert data["next_practice_step"].startswith("下次用 login")
     assert db_session.scalar(
         select(PracticeAttempt).where(PracticeAttempt.knowledge_card_id == card.id)

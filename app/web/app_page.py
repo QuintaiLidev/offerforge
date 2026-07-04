@@ -1231,6 +1231,17 @@ APP_HTML = """<!doctype html>
       return block;
     }
 
+    function formatScoreFailureMessage(error, mode) {
+      const detail = error instanceof Error ? error.message : String(error);
+      if (mode === "ai" && /request timed out|AbortError/i.test(detail)) {
+        return "AI评分超时：完整答案生成较慢，请稍后重试或换稳定网络。";
+      }
+      if (mode === "ai" && /Load failed|TypeError|request failed/i.test(detail)) {
+        return "AI评分请求失败：网络连接中断或服务暂时不可用，请稍后重试。";
+      }
+      return `评分失败：${detail}`;
+    }
+
     function hasScoreContent(content) {
       if (Array.isArray(content)) {
         return content.some((item) => String(item || "").trim());
@@ -1289,6 +1300,7 @@ APP_HTML = """<!doctype html>
         createOptionalScoreBlock("60秒面试口述版", score.interview_answer_60s || ""),
         createOptionalScoreBlock("30秒精简版", compactAnswer),
         createOptionalScoreBlock("面试官可能追问", score.follow_up_questions || []),
+        createOptionalScoreBlock("面试官追问与简短回答", score.follow_up_qas || [], true),
         createOptionalScoreBlock("下一步练习建议", score.next_practice_step || ""),
       ].filter(Boolean);
 
@@ -1341,7 +1353,8 @@ APP_HTML = """<!doctype html>
         mode === "ai" ? elements.aiScoreAnswerButton : elements.scoreAnswerButton;
       elements.scoreAnswerButton.disabled = true;
       elements.aiScoreAnswerButton.disabled = true;
-      activeScoreButton.textContent = mode === "ai" ? "AI评分中..." : "规则评分中...";
+      activeScoreButton.textContent =
+        mode === "ai" ? "AI评分中，完整答案可能需要 30-90 秒..." : "规则评分中...";
       if (mode === "ai") {
         elements.scoreAnswerButton.textContent = "规则评分";
       }
@@ -1349,7 +1362,7 @@ APP_HTML = """<!doctype html>
       try {
         const score = await fetchJson("/api/v1/answer-arena/score", {
           method: "POST",
-          timeoutMs: mode === "ai" ? 30000 : 15000,
+          timeoutMs: mode === "ai" ? 90000 : 15000,
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({
             card_id: state.currentCard.id,
@@ -1359,7 +1372,7 @@ APP_HTML = """<!doctype html>
         });
         renderScoreResult(score);
       } catch (error) {
-        const message = `评分失败：${error.message}`;
+        const message = formatScoreFailureMessage(error, mode);
         showError(message);
         renderScoreError(message);
       } finally {

@@ -266,21 +266,23 @@ def test_service_rejects_openrouter_backend_without_key(db_session) -> None:
     assert str(exc.value) == "OpenRouter API key is not configured."
 
 
-def test_ai_score_payload_parser_rejects_missing_dimensions() -> None:
-    with pytest.raises(AiScoringInvalidResponseError):
-        parse_ai_score_payload(
-            {
-                "total_score": 70,
-                "dimension_scores": {"direct_answer": 7},
-                "strengths": [],
-                "problems": [],
-                "risk_expressions": [],
-                "suggestions": [],
-                "optimized_answer_30s": "summary",
-                "memory_labels": [],
-            },
-            provider="openai",
-        )
+def test_ai_score_payload_parser_defaults_missing_dimensions() -> None:
+    result = parse_ai_score_payload(
+        {
+            "total_score": 70,
+            "dimension_scores": {"direct_answer": 7},
+            "strengths": [],
+            "problems": [],
+            "risk_expressions": [],
+            "suggestions": [],
+            "optimized_answer_30s": "summary",
+            "memory_labels": [],
+        },
+        provider="openai",
+    )
+
+    assert result.dimension_scores["direct_answer"] == 7
+    assert result.dimension_scores["structure"] == 0
 
 
 def test_ai_score_payload_parser_accepts_coaching_fields() -> None:
@@ -303,6 +305,9 @@ def test_ai_score_payload_parser_accepts_coaching_fields() -> None:
         "interview_answer_60s": "一分钟口述版：我会先说结论，再给例子。",
         "interview_answer_30s": "三十秒精简版：结论、例子、边界。",
         "follow_up_questions": ["你怎么做 SQL 断言？"],
+        "follow_up_qas": [
+            "Q：你怎么做 SQL 断言？\nA：我会用唯一业务编号查库，核对状态和关键字段。"
+        ],
         "next_practice_step": "下次用 login -> db assert 讲一遍。",
     }
 
@@ -315,6 +320,7 @@ def test_ai_score_payload_parser_accepts_coaching_fields() -> None:
     assert result.interview_answer_60s.startswith("一分钟口述版")
     assert result.interview_answer_30s.startswith("三十秒精简版")
     assert result.follow_up_questions == ["你怎么做 SQL 断言？"]
+    assert result.follow_up_qas[0].startswith("Q：你怎么做 SQL 断言")
     assert result.next_practice_step == "下次用 login -> db assert 讲一遍。"
 
 
@@ -336,12 +342,88 @@ def test_ai_score_payload_parser_defaults_missing_coaching_fields() -> None:
     )
 
     assert result.missing_points == []
-    assert result.complete_answer is None
+    assert result.complete_answer == ""
     assert result.concrete_examples == []
-    assert result.interview_answer_60s is None
-    assert result.interview_answer_30s is None
+    assert result.interview_answer_60s == ""
+    assert result.interview_answer_30s == ""
     assert result.follow_up_questions == []
-    assert result.next_practice_step is None
+    assert result.follow_up_qas == []
+    assert result.next_practice_step == ""
+
+
+def test_ai_score_payload_parser_coerces_loose_list_and_score_fields() -> None:
+    result = parse_ai_score_payload(
+        {
+            "total_score": "82",
+            "dimension_scores": {
+                "direct_answer": "8",
+                "structure": "bad",
+                "real_example": 9.3,
+            },
+            "strengths": "结构清晰",
+            "problems": {"text": "缺少项目落点"},
+            "risk_expressions": None,
+            "suggestions": "补一个具体例子",
+            "optimized_answer_30s": ["先说结论", "再说例子"],
+            "memory_labels": {"value": ["项目表达", 123]},
+            "missing_points": {"value": "缺少 SQL 断言"},
+            "complete_answer": {"content": "完整答案内容"},
+            "concrete_examples": [
+                {"text": "assert response.status_code == 200"},
+                {"description": "select status from users;"},
+            ],
+            "follow_up_questions": [{"question": "怎么定位失败？"}],
+            "follow_up_qas": "Q：怎么定位失败？\nA：先复现，再看接口、日志和数据库。",
+        },
+        provider="openrouter",
+    )
+
+    assert result.total_score == 82
+    assert result.dimension_scores["direct_answer"] == 8
+    assert result.dimension_scores["structure"] == 0
+    assert result.dimension_scores["real_example"] == 9
+    assert result.strengths == ["结构清晰"]
+    assert result.problems == ["缺少项目落点"]
+    assert result.risk_expressions == []
+    assert result.suggestions == ["补一个具体例子"]
+    assert result.optimized_answer_30s == "先说结论\n再说例子"
+    assert result.memory_labels == ["项目表达", "123"]
+    assert result.missing_points == ["缺少 SQL 断言"]
+    assert result.complete_answer == "完整答案内容"
+    assert result.concrete_examples == [
+        "assert response.status_code == 200",
+        "select status from users;",
+    ]
+    assert result.follow_up_questions == ["Q：怎么定位失败？"]
+    assert result.follow_up_qas == ["Q：怎么定位失败？\nA：先复现，再看接口、日志和数据库。"]
+
+
+def test_ai_score_payload_parser_coerces_list_dict_follow_up_qas() -> None:
+    result = parse_ai_score_payload(
+        {
+            "total_score": 75,
+            "dimension_scores": {},
+            "strengths": [{"text": "有结论"}, {"value": True}],
+            "problems": [{"content": "例子不足"}],
+            "risk_expressions": [],
+            "suggestions": [],
+            "optimized_answer_30s": {"answer": "三十秒回答"},
+            "memory_labels": [],
+            "follow_up_qas": [
+                {"question": "为什么用 CSS Selector？", "answer": "因为稳定属性下写法更简洁。"},
+                {"q": "XPath 何时更适合？", "a": "需要文本或兄弟节点定位时更适合。"},
+            ],
+        },
+        provider="openai",
+    )
+
+    assert result.strengths == ["有结论", "True"]
+    assert result.problems == ["例子不足"]
+    assert result.optimized_answer_30s == "A：三十秒回答"
+    assert result.follow_up_qas == [
+        "Q：为什么用 CSS Selector？\nA：因为稳定属性下写法更简洁。",
+        "Q：XPath 何时更适合？\nA：需要文本或兄弟节点定位时更适合。",
+    ]
 
 
 def test_openai_prompt_requires_example_first_coaching_by_topic(db_session) -> None:
@@ -378,6 +460,8 @@ def test_openai_prompt_requires_example_first_coaching_by_topic(db_session) -> N
     assert "STAR 结构" in hr_prompt
     assert "complete_answer" in project_prompt
     assert "interview_answer_60s" in project_prompt
+    assert "follow_up_qas" in project_prompt
+    assert "exactly 3" in project_prompt
     assert "next_practice_step" in project_prompt
 
 
