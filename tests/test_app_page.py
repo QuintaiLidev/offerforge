@@ -89,7 +89,7 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "具体例子" in response.text
     assert "60秒面试口述版" in response.text
     assert "30秒精简版" in response.text
-    assert "面试官可能追问" in response.text
+    assert "面试官可能追问" not in response.text
     assert "面试官追问与简短回答" in response.text
     assert "下一步练习建议" in response.text
     assert "score-example-pre" in response.text

@@ -1401,7 +1401,6 @@ APP_HTML = """<!doctype html>
         createOptionalScoreBlock("具体例子", score.concrete_examples || [], true),
         createOptionalScoreBlock("60秒面试口述版", score.interview_answer_60s || ""),
         createOptionalScoreBlock("30秒精简版", compactAnswer),
-        createOptionalScoreBlock("面试官可能追问", score.follow_up_questions || []),
         createOptionalScoreBlock("面试官追问与简短回答", score.follow_up_qas || [], true),
         createOptionalScoreBlock("下一步练习建议", score.next_practice_step || ""),
       ].filter(Boolean);
