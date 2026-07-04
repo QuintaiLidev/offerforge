@@ -103,7 +103,33 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "parseTagsInput" in response.text
     assert "reference_answer" in response.text
     assert "今日复习" in response.text
-    assert "今天已练习" in response.text
+    assert "今日已练" in response.text
+    assert "历史记录" in response.text
+    assert "今天还没有已练习卡片" in response.text
+    assert "tab-bar" in response.text
+    assert 'data-tab="today"' in response.text
+    assert 'data-tab="done"' in response.text
+    assert 'data-tab="history"' in response.text
+    assert 'class="tab-button active" type="button" data-tab="today"' in response.text
+    assert 'aria-selected="true">今日复习' in response.text
+    assert 'id="todayReviewPanel"' in response.text
+    assert 'data-tab-panel="today"' in response.text
+    assert 'id="doneTodayPanel"' in response.text
+    assert 'data-tab-panel="done"' in response.text
+    assert 'id="historyPanel"' in response.text
+    assert 'data-tab-panel="history"' in response.text
+    assert 'activeTab: "today"' in response.text
+    assert "function setActiveTab(tabName)" in response.text
+    assert 'elements.todayReviewPanel.classList.toggle("hidden", tabName !== "today")' in response.text
+    assert 'elements.doneTodayPanel.classList.toggle("hidden", tabName !== "done")' in response.text
+    assert 'elements.historyPanel.classList.toggle("hidden", tabName !== "history")' in response.text
+    assert 'button.addEventListener("click", () => setActiveTab(button.dataset.tab))' in response.text
+    assert 'setActiveTab("today")' in response.text
+    set_active_tab_body = response.text.split("function setActiveTab(tabName)", 1)[1].split(
+        "async function fetchJson",
+        1,
+    )[0]
+    assert "answerInput.value" not in set_active_tab_body
     assert "查看答案" in response.text
     assert "答案内容" in response.text
     assert "调度信息" in response.text

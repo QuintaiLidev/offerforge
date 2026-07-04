@@ -70,6 +70,42 @@ APP_HTML = """<!doctype html>
       font-size: 1rem;
     }
 
+    .tab-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin: 0 0 14px;
+      padding: 4px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #edf1f2;
+    }
+
+    .tab-button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .tab-button.active,
+    .tab-button[aria-selected="true"] {
+      background: var(--surface);
+      color: var(--accent-strong);
+      font-weight: 800;
+      box-shadow: 0 1px 5px rgba(18, 28, 45, 0.08);
+    }
+
+    .tab-panel {
+      display: block;
+    }
+
     .status-row {
       display: flex;
       align-items: center;
@@ -534,83 +570,92 @@ APP_HTML = """<!doctype html>
       <p>今日复习</p>
     </header>
 
-    <div class="status-row" aria-live="polite">
-      <span id="loadingText">加载中...</span>
-      <span id="modeText" class="mode hidden">mode: due</span>
-    </div>
+    <nav class="tab-bar" aria-label="复习模块">
+      <button class="tab-button active" type="button" data-tab="today" aria-selected="true">今日复习</button>
+      <button class="tab-button" type="button" data-tab="done" aria-selected="false">今日已练</button>
+      <button class="tab-button" type="button" data-tab="history" aria-selected="false">历史记录</button>
+    </nav>
 
     <div id="successMessage" class="notice" role="status"></div>
     <div id="errorMessage" class="error" role="alert"></div>
-    <section id="emptyState" class="panel empty hidden">今天没有需要复习的内容。</section>
 
-    <section id="cardPanel" class="panel card hidden" aria-live="polite">
-      <div class="meta">
-        <span id="categoryText" class="chip"></span>
-        <span id="difficultyText" class="chip"></span>
-        <span id="masteryText" class="chip"></span>
+    <section id="todayReviewPanel" class="tab-panel" data-tab-panel="today">
+      <div class="status-row" aria-live="polite">
+        <span id="loadingText">加载中...</span>
+        <span id="modeText" class="mode hidden">mode: due</span>
       </div>
 
-      <h2 id="cardTitle" class="title"></h2>
+      <section id="emptyState" class="panel empty hidden">今天没有需要复习的内容。</section>
 
-      <div class="card-actions">
-        <button id="editCurrentCardButton" class="edit-card-button" type="button">编辑卡片</button>
-        <div id="currentEditContainer"></div>
-      </div>
-
-      <div class="section">
-        <h2>调度信息</h2>
-        <div id="scheduleInfo" class="schedule-info"></div>
-      </div>
-
-      <div class="section">
-        <h2>题目</h2>
-        <p id="questionText" class="question"></p>
-      </div>
-
-      <div class="section">
-        <button id="showAnswerButton" class="answer-toggle" type="button">显示答案</button>
-        <div id="answerText" class="answer"></div>
-      </div>
-
-      <div class="section">
-        <h2>答题记录</h2>
-        <textarea
-          id="answerInput"
-          class="answer-input"
-          name="answer_text"
-          autocomplete="off"
-          placeholder="先写下或粘贴你的回答，再点击答题评分"
-        ></textarea>
-        <button id="scoreAnswerButton" class="answer-score-button" type="button">答题评分</button>
-        <button id="aiScoreAnswerButton" class="answer-score-button" type="button">AI快评</button>
-        <button id="deepScoreAnswerButton" class="answer-score-button" type="button">深度教练</button>
-        <div id="scoreResult" class="score-result" aria-live="polite"></div>
-      </div>
-
-      <div class="section">
-        <h2>评价</h2>
-        <div class="rating-list" id="ratingButtons">
-          <button class="rating-button" type="button" data-rating="dont_know">完全不会</button>
-          <button class="rating-button" type="button" data-rating="with_hint">看提示才能完成</button>
-          <button class="rating-button" type="button" data-rating="correct_slow">正确但较慢</button>
-          <button class="rating-button" type="button" data-rating="correct_explain">正确且能解释</button>
-          <button class="rating-button" type="button" data-rating="transfer">能迁移到新场景</button>
+      <section id="cardPanel" class="panel card hidden" aria-live="polite">
+        <div class="meta">
+          <span id="categoryText" class="chip"></span>
+          <span id="difficultyText" class="chip"></span>
+          <span id="masteryText" class="chip"></span>
         </div>
-      </div>
+
+        <h2 id="cardTitle" class="title"></h2>
+
+        <div class="card-actions">
+          <button id="editCurrentCardButton" class="edit-card-button" type="button">编辑卡片</button>
+          <div id="currentEditContainer"></div>
+        </div>
+
+        <div class="section">
+          <h2>调度信息</h2>
+          <div id="scheduleInfo" class="schedule-info"></div>
+        </div>
+
+        <div class="section">
+          <h2>题目</h2>
+          <p id="questionText" class="question"></p>
+        </div>
+
+        <div class="section">
+          <button id="showAnswerButton" class="answer-toggle" type="button">显示答案</button>
+          <div id="answerText" class="answer"></div>
+        </div>
+
+        <div class="section">
+          <h2>答题记录</h2>
+          <textarea
+            id="answerInput"
+            class="answer-input"
+            name="answer_text"
+            autocomplete="off"
+            placeholder="先写下或粘贴你的回答，再点击答题评分"
+          ></textarea>
+          <button id="scoreAnswerButton" class="answer-score-button" type="button">答题评分</button>
+          <button id="aiScoreAnswerButton" class="answer-score-button" type="button">AI快评</button>
+          <button id="deepScoreAnswerButton" class="answer-score-button" type="button">深度教练</button>
+          <div id="scoreResult" class="score-result" aria-live="polite"></div>
+        </div>
+
+        <div class="section">
+          <h2>评价</h2>
+          <div class="rating-list" id="ratingButtons">
+            <button class="rating-button" type="button" data-rating="dont_know">完全不会</button>
+            <button class="rating-button" type="button" data-rating="with_hint">看提示才能完成</button>
+            <button class="rating-button" type="button" data-rating="correct_slow">正确但较慢</button>
+            <button class="rating-button" type="button" data-rating="correct_explain">正确且能解释</button>
+            <button class="rating-button" type="button" data-rating="transfer">能迁移到新场景</button>
+          </div>
+        </div>
+      </section>
     </section>
 
-    <section id="doneTodayPanel" class="panel done-section review-section" aria-live="polite">
+    <section id="doneTodayPanel" class="panel done-section review-section tab-panel hidden" data-tab-panel="done" aria-live="polite">
       <div class="done-header">
-        <h2 class="review-section-title">今天已练习</h2>
+        <h2 class="review-section-title">今日已练</h2>
         <span id="doneLoadingText" class="done-loading">加载中...</span>
       </div>
       <div id="doneEmptyState" class="empty hidden">今天还没有已练习卡片</div>
       <div id="doneList" class="done-list"></div>
     </section>
 
-    <section id="historyPanel" class="panel done-section review-section" aria-live="polite">
+    <section id="historyPanel" class="panel done-section review-section tab-panel hidden" data-tab-panel="history" aria-live="polite">
       <div class="done-header">
-        <h2 class="review-section-title">练习历史</h2>
+        <h2 class="review-section-title">历史记录</h2>
         <span id="historyLoadingText" class="done-loading">加载中...</span>
       </div>
       <div id="historyEmptyState" class="empty hidden">暂无练习历史</div>
@@ -624,9 +669,12 @@ APP_HTML = """<!doctype html>
       cardStartedAt: null,
       submitting: false,
       scoring: false,
+      activeTab: "today",
     };
 
     const elements = {
+      tabButtons: Array.from(document.querySelectorAll("[data-tab]")),
+      todayReviewPanel: document.querySelector("#todayReviewPanel"),
       loadingText: document.querySelector("#loadingText"),
       modeText: document.querySelector("#modeText"),
       successMessage: document.querySelector("#successMessage"),
@@ -649,9 +697,11 @@ APP_HTML = """<!doctype html>
       deepScoreAnswerButton: document.querySelector("#deepScoreAnswerButton"),
       scoreResult: document.querySelector("#scoreResult"),
       ratingButtons: Array.from(document.querySelectorAll("[data-rating]")),
+      doneTodayPanel: document.querySelector("#doneTodayPanel"),
       doneLoadingText: document.querySelector("#doneLoadingText"),
       doneEmptyState: document.querySelector("#doneEmptyState"),
       doneList: document.querySelector("#doneList"),
+      historyPanel: document.querySelector("#historyPanel"),
       historyLoadingText: document.querySelector("#historyLoadingText"),
       historyEmptyState: document.querySelector("#historyEmptyState"),
       historyList: document.querySelector("#historyList"),
@@ -791,6 +841,18 @@ APP_HTML = """<!doctype html>
           disabled && activeRating === button.dataset.rating
             ? "提交中..."
             : button.dataset.originalText;
+      });
+    }
+
+    function setActiveTab(tabName) {
+      state.activeTab = tabName;
+      elements.todayReviewPanel.classList.toggle("hidden", tabName !== "today");
+      elements.doneTodayPanel.classList.toggle("hidden", tabName !== "done");
+      elements.historyPanel.classList.toggle("hidden", tabName !== "history");
+      elements.tabButtons.forEach((button) => {
+        const isActive = button.dataset.tab === tabName;
+        button.classList.toggle("active", isActive);
+        button.setAttribute("aria-selected", String(isActive));
       });
     }
 
@@ -1480,7 +1542,11 @@ APP_HTML = """<!doctype html>
     elements.ratingButtons.forEach((button) => {
       button.addEventListener("click", () => submitRating(button.dataset.rating));
     });
+    elements.tabButtons.forEach((button) => {
+      button.addEventListener("click", () => setActiveTab(button.dataset.tab));
+    });
 
+    setActiveTab("today");
     loadToday();
     loadDoneToday();
     loadHistory();
