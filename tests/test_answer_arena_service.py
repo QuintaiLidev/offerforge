@@ -100,10 +100,16 @@ def test_career_python_automation_risk_is_detected(db_session) -> None:
 
 class FakeAiScoreProvider:
     def __init__(self) -> None:
-        self.calls: list[tuple[int, str]] = []
+        self.calls: list[tuple[int, str, str]] = []
 
-    def score(self, *, card, user_answer: str) -> AnswerScoreResponse:
-        self.calls.append((card.id, user_answer))
+    def score(
+        self,
+        *,
+        card,
+        user_answer: str,
+        depth: str = "quick",
+    ) -> AnswerScoreResponse:
+        self.calls.append((card.id, user_answer, depth))
         return AnswerScoreResponse(
             provider="openai",
             total_score=88,
@@ -139,8 +145,128 @@ def test_service_can_score_with_injected_ai_provider(db_session) -> None:
     assert result.provider == "openai"
     assert result.total_score == 88
     assert provider.calls == [
-        (card.id, "This answer is long enough and uses a structured project example.")
+        (card.id, "This answer is long enough and uses a structured project example.", "quick")
     ]
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_depth"),
+    [
+        ("ai", "quick"),
+        ("ai_quick", "quick"),
+        ("ai_deep", "deep"),
+    ],
+)
+def test_service_routes_ai_modes_to_depth(
+    db_session,
+    mode: str,
+    expected_depth: str,
+) -> None:
+    card = create_card(
+        db_session,
+        title=f"AI scoring {mode}",
+        category=KnowledgeCategory.PROJECT_EXPLANATION,
+    )
+    provider = FakeAiScoreProvider()
+    service = AnswerArenaService(
+        KnowledgeCardRepository(db_session),
+        ai_provider=provider,
+        settings=Settings(openai_api_key="test-key"),
+    )
+
+    result = service.score_answer(
+        card_id=card.id,
+        mode=mode,
+        user_answer="This answer is long enough and uses a structured project example.",
+    )
+
+    assert result.provider == "openai"
+    assert provider.calls == [
+        (
+            card.id,
+            "This answer is long enough and uses a structured project example.",
+            expected_depth,
+        )
+    ]
+
+
+def test_rule_mode_does_not_call_ai_provider(db_session) -> None:
+    card = create_card(
+        db_session,
+        title="Rule scoring only",
+        category=KnowledgeCategory.PROJECT_EXPLANATION,
+    )
+
+    class FailingAiProvider:
+        def score(self, **kwargs) -> AnswerScoreResponse:
+            raise AssertionError("rule mode must not call AI provider")
+
+    service = AnswerArenaService(
+        KnowledgeCardRepository(db_session),
+        ai_provider=FailingAiProvider(),
+        settings=Settings(openai_api_key="test-key"),
+    )
+
+    result = service.score_answer(
+        card_id=card.id,
+        mode="rule",
+        user_answer="This answer has enough structure and a project example for rule scoring.",
+    )
+
+    assert result.provider == "rule"
+
+
+def test_rule_scoring_penalizes_non_core_dev_answer_without_test_landing(
+    db_session,
+) -> None:
+    card = create_card(
+        db_session,
+        title="Java 多线程有哪几种实现方式？",
+        category=KnowledgeCategory.REAL_BUSINESS_CASE,
+        reference_answer="Java 多线程包括 Thread、Runnable、Callable、Future 和线程池。",
+    )
+    service = AnswerArenaService(KnowledgeCardRepository(db_session))
+
+    result = service.score_answer(
+        card_id=card.id,
+        mode="rule",
+        user_answer="Java 多线程主要有 Thread、Runnable、Callable、Future 和 ExecutorService 线程池。",
+    )
+
+    assert result.dimension_scores["job_match"] <= 4
+    assert result.dimension_scores["real_example"] <= 4
+    assert any("先答基础概念，再转测试开发应用场景" in item for item in result.suggestions)
+    assert "我不是以 Java 后端开发为主线" in result.optimized_answer_30s
+
+
+def test_rule_scoring_rewards_non_core_dev_answer_with_test_landing(
+    db_session,
+) -> None:
+    card = create_card(
+        db_session,
+        title="Java 多线程有哪几种实现方式？",
+        category=KnowledgeCategory.REAL_BUSINESS_CASE,
+        reference_answer="Java 多线程包括 Thread、Runnable、Callable、Future 和线程池。",
+    )
+    service = AnswerArenaService(KnowledgeCardRepository(db_session))
+
+    weak = service.score_answer(
+        card_id=card.id,
+        mode="rule",
+        user_answer="Java 多线程主要有 Thread、Runnable、Callable、Future 和 ExecutorService 线程池。",
+    )
+    strong = service.score_answer(
+        card_id=card.id,
+        mode="rule",
+        user_answer=(
+            "Java 多线程常见有 Thread、Runnable、Callable、Future 和线程池。"
+            "我不是以 Java 后端开发为主线，但测试开发要理解它在并发测试、"
+            "接口压测、数据一致性、超卖和重复提交问题定位里的价值。"
+        ),
+    )
+
+    assert strong.dimension_scores["job_match"] > weak.dimension_scores["job_match"]
+    assert strong.dimension_scores["real_example"] > weak.dimension_scores["real_example"]
 
 
 def test_service_rejects_ai_mode_without_openai_key(db_session) -> None:
@@ -193,9 +319,16 @@ def test_service_uses_openrouter_backend(
                 }
             )
 
-        def score(self, *, card, user_answer: str) -> AnswerScoreResponse:
+        def score(
+            self,
+            *,
+            card,
+            user_answer: str,
+            depth: str = "quick",
+        ) -> AnswerScoreResponse:
             captured["card_id"] = card.id
             captured["user_answer"] = user_answer
+            captured["depth"] = depth
             return AnswerScoreResponse(
                 provider="openrouter",
                 total_score=86,
@@ -242,6 +375,7 @@ def test_service_uses_openrouter_backend(
         "app_title": "OfferForge Test",
         "card_id": card.id,
         "user_answer": "This answer is long enough for OpenRouter scoring.",
+        "depth": "quick",
     }
 
 
@@ -451,17 +585,27 @@ def test_openai_prompt_requires_example_first_coaching_by_topic(db_session) -> N
 
     python_prompt = provider._build_prompt(python_card, "answer")
     ui_prompt = provider._build_prompt(ui_card, "answer")
-    project_prompt = provider._build_prompt(project_card, "answer")
+    project_prompt = provider._build_prompt(project_card, "answer", depth="quick")
+    deep_project_prompt = provider._build_prompt(project_card, "answer", depth="deep")
     hr_prompt = provider._build_prompt(hr_card, "answer")
 
     assert "必须给 Python 代码例子" in python_prompt
     assert "CSS Selector / XPath 示例" in ui_prompt
     assert "真实项目表达模板" in project_prompt
     assert "STAR 结构" in hr_prompt
+    assert "Candidate profile" in project_prompt
+    assert "Candidate profile" in deep_project_prompt
+    assert "Do not package the user as a Java backend" in project_prompt
+    assert "测试开发视角" in deep_project_prompt
+    assert "Depth: ai_quick" in project_prompt
+    assert "Do not produce a long report" in project_prompt
+    assert "Depth: ai_deep" in deep_project_prompt
+    assert "complete_answer: 180-350" in deep_project_prompt
     assert "complete_answer" in project_prompt
     assert "interview_answer_60s" in project_prompt
     assert "follow_up_qas" in project_prompt
-    assert "exactly 3" in project_prompt
+    assert "follow_up_qas: exactly 2" in project_prompt
+    assert "follow_up_qas: exactly 3" in deep_project_prompt
     assert "next_practice_step" in project_prompt
 
 

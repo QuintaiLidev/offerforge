@@ -13,7 +13,11 @@ from app.main import app
 from app.models import KnowledgeCard, PracticeAttempt
 from app.models.enums import KnowledgeCategory
 from app.repositories import KnowledgeCardRepository
-from app.schemas.answer_arena import ANSWER_SCORE_DIMENSIONS, AnswerScoreResponse
+from app.schemas.answer_arena import (
+    ANSWER_SCORE_DIMENSIONS,
+    AnswerScoreRequest,
+    AnswerScoreResponse,
+)
 from app.schemas.knowledge_card import KnowledgeCardCreate
 from app.services.answer_arena import AnswerArenaService
 from app.services.exceptions import (
@@ -22,6 +26,17 @@ from app.services.exceptions import (
 )
 
 pytestmark = pytest.mark.anyio
+
+
+@pytest.mark.parametrize("mode", ["rule", "ai", "ai_quick", "ai_deep"])
+def test_answer_score_request_accepts_supported_modes(mode: str) -> None:
+    schema = AnswerScoreRequest(
+        card_id=1,
+        mode=mode,
+        user_answer="This answer is long enough to pass validation.",
+    )
+
+    assert schema.mode == mode
 
 
 @pytest.fixture(autouse=True)
@@ -129,7 +144,13 @@ async def test_score_api_detects_ai_risk_expression(client: httpx.AsyncClient, d
 
 
 class FakeAiProvider:
-    def score(self, *, card: KnowledgeCard, user_answer: str) -> AnswerScoreResponse:
+    def score(
+        self,
+        *,
+        card: KnowledgeCard,
+        user_answer: str,
+        depth: str = "quick",
+    ) -> AnswerScoreResponse:
         return AnswerScoreResponse(
             provider="openai",
             total_score=91,
@@ -156,7 +177,13 @@ class FakeAiProvider:
 
 
 class FakeOpenRouterProvider:
-    def score(self, *, card: KnowledgeCard, user_answer: str) -> AnswerScoreResponse:
+    def score(
+        self,
+        *,
+        card: KnowledgeCard,
+        user_answer: str,
+        depth: str = "quick",
+    ) -> AnswerScoreResponse:
         return AnswerScoreResponse(
             provider="openrouter",
             total_score=93,
@@ -181,12 +208,24 @@ class FakeOpenRouterProvider:
 
 
 class TimeoutAiProvider:
-    def score(self, *, card: KnowledgeCard, user_answer: str) -> AnswerScoreResponse:
+    def score(
+        self,
+        *,
+        card: KnowledgeCard,
+        user_answer: str,
+        depth: str = "quick",
+    ) -> AnswerScoreResponse:
         raise AiScoringTimeoutError("AI scoring provider timed out.")
 
 
 class InvalidAiProvider:
-    def score(self, *, card: KnowledgeCard, user_answer: str) -> AnswerScoreResponse:
+    def score(
+        self,
+        *,
+        card: KnowledgeCard,
+        user_answer: str,
+        depth: str = "quick",
+    ) -> AnswerScoreResponse:
         raise AiScoringInvalidResponseError("AI scoring response was invalid.")
 
 
@@ -248,6 +287,60 @@ async def test_score_api_ai_mode_uses_mocked_provider(
     assert db_session.scalar(
         select(PracticeAttempt).where(PracticeAttempt.knowledge_card_id == card.id)
     ) is None
+
+
+@pytest.mark.parametrize("mode", ["ai_quick", "ai_deep"])
+async def test_score_api_ai_quick_and_deep_do_not_write_attempt_or_card(
+    client: httpx.AsyncClient,
+    db_session: Session,
+    mode: str,
+) -> None:
+    card = create_card(db_session, title=f"AI scoring {mode}")
+    before = {
+        "title": card.title,
+        "question": card.question,
+        "reference_answer": card.reference_answer,
+        "mastery_level": card.mastery_level,
+        "next_review_at": card.next_review_at,
+        "last_practiced_at": card.last_practiced_at,
+        "consecutive_correct_count": card.consecutive_correct_count,
+        "total_error_count": card.total_error_count,
+        "updated_at": card.updated_at,
+    }
+
+    def override_service() -> AnswerArenaService:
+        return AnswerArenaService(
+            KnowledgeCardRepository(db_session),
+            ai_provider=FakeAiProvider(),
+            settings=Settings(openai_api_key="test-key"),
+        )
+
+    app.dependency_overrides[get_answer_arena_service] = override_service
+
+    response = await client.post(
+        "/api/v1/answer-arena/score",
+        json={
+            "card_id": card.id,
+            "mode": mode,
+            "user_answer": "This answer is long enough and includes a structured project example for scoring.",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider"] == "openai"
+    assert db_session.scalar(
+        select(PracticeAttempt).where(PracticeAttempt.knowledge_card_id == card.id)
+    ) is None
+    db_session.refresh(card)
+    assert card.title == before["title"]
+    assert card.question == before["question"]
+    assert card.reference_answer == before["reference_answer"]
+    assert card.mastery_level == before["mastery_level"]
+    assert card.next_review_at == before["next_review_at"]
+    assert card.last_practiced_at == before["last_practiced_at"]
+    assert card.consecutive_correct_count == before["consecutive_correct_count"]
+    assert card.total_error_count == before["total_error_count"]
+    assert card.updated_at == before["updated_at"]
 
 
 async def test_score_api_ai_mode_without_key_returns_503(

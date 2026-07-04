@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import re
-from typing import Protocol
+from typing import Literal, Protocol
 
 from app.core.config import Settings, get_settings
 from app.models import KnowledgeCard
 from app.models.enums import KnowledgeCategory
 from app.repositories import KnowledgeCardRepository
 from app.schemas.answer_arena import ANSWER_SCORE_DIMENSIONS, AnswerScoreResponse
+from app.services.candidate_profile import (
+    NON_CORE_DEV_ANSWER_30S,
+    NON_CORE_DEV_KEYWORDS,
+    NON_CORE_DEV_SUGGESTION,
+    TEST_DEV_LANDING_KEYWORDS,
+)
 from app.services.answer_score_provider import (
     OpenAIAnswerScoreProvider,
     OpenRouterAnswerScoreProvider,
@@ -28,6 +34,7 @@ CAREER_POSITIVE = ("测试开发", "技术化质量保障", "工具化提效", "
 CAREER_RISK = ("想做 Python 自动化", "外包没发展", "公司做不了")
 BOUNDARY_KEYWORDS = ("边界", "如实", "不是替代", "我负责验证", "质量责任", "不夸大", "风险", "人工", "校验", "验证")
 PROFESSIONAL_KEYWORDS = ("质量", "稳定", "闭环", "复盘", "链路", "场景", "数据", "风险", "验证", "落地")
+ScoringDepth = Literal["quick", "deep"]
 
 
 def _contains_any(text: str, keywords: tuple[str, ...]) -> list[str]:
@@ -44,6 +51,8 @@ def _card_text(card: KnowledgeCard) -> str:
         [
             card.title,
             card.category.value if hasattr(card.category, "value") else str(card.category),
+            card.question,
+            card.core_knowledge,
             card.reference_answer,
             " ".join(card.tags or []),
         ]
@@ -65,6 +74,16 @@ def _is_career_card(card: KnowledgeCard) -> bool:
     return card.category == KnowledgeCategory.HR_INTERVIEW or any(k.lower() in text for k in ("职业", "岗位", "入职", "方向", "负责人"))
 
 
+def _is_non_core_dev_card(card: KnowledgeCard) -> bool:
+    text = _card_text(card)
+    return any(keyword.lower() in text for keyword in NON_CORE_DEV_KEYWORDS)
+
+
+def _has_test_dev_landing(answer: str) -> bool:
+    lower_answer = answer.lower()
+    return any(keyword.lower() in lower_answer for keyword in TEST_DEV_LANDING_KEYWORDS)
+
+
 def _extract_optimized_answer(reference_answer: str) -> str:
     text = reference_answer.strip()
     match = re.search(r"【30秒(?:口述|口述版)?】(?P<answer>.*?)(?:\n【|$)", text, flags=re.S)
@@ -80,6 +99,7 @@ class AnswerScoreProvider(Protocol):
         *,
         card: KnowledgeCard,
         user_answer: str,
+        depth: ScoringDepth = "quick",
     ) -> AnswerScoreResponse:
         """Score an answer without mutating OfferForge state."""
 
@@ -108,8 +128,18 @@ class AnswerArenaService:
             raise KnowledgeCardNotFoundError(card_id)
 
         answer = user_answer.strip()
-        if mode == "ai":
-            return self._score_answer_with_ai(card=card, user_answer=answer)
+        if mode in {"ai", "ai_quick"}:
+            return self._score_answer_with_ai(
+                card=card,
+                user_answer=answer,
+                depth="quick",
+            )
+        if mode == "ai_deep":
+            return self._score_answer_with_ai(
+                card=card,
+                user_answer=answer,
+                depth="deep",
+            )
         return self._score_answer_with_rules(card=card, user_answer=answer)
 
     def _score_answer_with_ai(
@@ -117,9 +147,10 @@ class AnswerArenaService:
         *,
         card: KnowledgeCard,
         user_answer: str,
+        depth: ScoringDepth,
     ) -> AnswerScoreResponse:
         provider = self.ai_provider or self._build_ai_score_provider()
-        return provider.score(card=card, user_answer=user_answer)
+        return provider.score(card=card, user_answer=user_answer, depth=depth)
 
     def _build_ai_score_provider(self) -> AnswerScoreProvider:
         if self.settings.ai_score_backend == "openrouter":
@@ -158,6 +189,8 @@ class AnswerArenaService:
         professional_hits = _contains_any(answer, PROFESSIONAL_KEYWORDS)
         risks = _contains_any(answer, GENERAL_RISKS)
         context_positive: list[str] = []
+        is_non_core_dev = _is_non_core_dev_card(card)
+        has_test_dev_landing = _has_test_dev_landing(answer)
 
         if _is_ui_card(card):
             context_positive += _contains_any(answer, UI_POSITIVE)
@@ -182,6 +215,14 @@ class AnswerArenaService:
             "professional_expression": _clamp(5 + min(3, len(professional_hits)) + (1 if context_positive else 0) - min(3, len(risks))),
             "risk_control": _clamp(8 - risk_penalty + min(2, len(boundary_hits))),
         }
+        if is_non_core_dev:
+            if has_test_dev_landing:
+                scores["job_match"] = _clamp(scores["job_match"] + 3)
+                scores["real_example"] = _clamp(scores["real_example"] + 2)
+                scores["boundary"] = _clamp(scores["boundary"] + 1)
+            else:
+                scores["job_match"] = min(scores["job_match"], 4)
+                scores["real_example"] = min(scores["real_example"], 4)
         total = round(sum(scores.values()) / (len(ANSWER_SCORE_DIMENSIONS) * 10) * 100)
 
         strengths = []
@@ -191,6 +232,8 @@ class AnswerArenaService:
             strengths.append("回答包含项目、接口、权限、数据或回归等真实场景词。")
         if context_positive:
             strengths.append("回答命中了当前题型的岗位匹配关键词。")
+        if is_non_core_dev and has_test_dev_landing:
+            strengths.append("回答能把偏开发题转回测试开发价值，例如并发测试、接口压测、数据一致性或问题定位。")
         if not strengths:
             strengths.append("已经开始组织自己的答案，可以继续补结构和案例。")
 
@@ -203,12 +246,16 @@ class AnswerArenaService:
             problems.append("真实案例不足，建议补充项目、接口、权限、缺陷或回归经历。")
         if risks:
             problems.append("存在容易削弱专业度或边界感的风险表达。")
+        if is_non_core_dev and not has_test_dev_landing:
+            problems.append("这类偏开发题不能只背概念，需要补测试开发落点，避免把自己包装成 Java 后端专家。")
 
         suggestions = [
             "按“一句结论 → 两个要点 → 一个例子 → 一句收尾”重答一遍。",
             "把 AI、工具或外部平台表述为提效手段，质量责任仍由自己承担。",
             "补充可验证动作，例如断言、日志、数据库、回归、上线风险确认。",
         ]
+        if is_non_core_dev:
+            suggestions.append(NON_CORE_DEV_SUGGESTION)
 
         memory_labels = ["结论先行", "两点一例", "边界感", "质量闭环"]
         if context_positive:
@@ -224,6 +271,10 @@ class AnswerArenaService:
             problems=problems,
             risk_expressions=risks,
             suggestions=suggestions,
-            optimized_answer_30s=_extract_optimized_answer(card.reference_answer),
+            optimized_answer_30s=(
+                NON_CORE_DEV_ANSWER_30S
+                if is_non_core_dev
+                else _extract_optimized_answer(card.reference_answer)
+            ),
             memory_labels=memory_labels,
         )

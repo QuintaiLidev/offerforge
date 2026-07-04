@@ -20,7 +20,7 @@ ANSWER_SCORE_DIMENSIONS = (
 class AnswerScoreRequest(SchemaModel):
     card_id: int = Field(gt=0)
     user_answer: str = Field(min_length=30)
-    mode: Literal["rule", "ai"] = "rule"
+    mode: Literal["rule", "ai", "ai_quick", "ai_deep"] = "rule"
 
     @field_validator("user_answer", mode="before")
     @classmethod

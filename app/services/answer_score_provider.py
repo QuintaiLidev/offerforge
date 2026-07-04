@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ValidationError
 
 from app.models import KnowledgeCard
 from app.schemas.answer_arena import ANSWER_SCORE_DIMENSIONS, AnswerScoreResponse
+from app.services.candidate_profile import CANDIDATE_ANSWER_RULES, CANDIDATE_PROFILE
 from app.services.exceptions import (
     AiScoringInvalidResponseError,
     AiScoringTimeoutError,
     AiScoringUnavailableError,
 )
+
+ScoringDepth = Literal["quick", "deep"]
 
 
 TEXT_KEYS = ("text", "content", "value", "answer", "description")
@@ -208,6 +211,7 @@ class OpenAIAnswerScoreProvider:
         *,
         card: KnowledgeCard,
         user_answer: str,
+        depth: ScoringDepth = "quick",
     ) -> AnswerScoreResponse:
         try:
             response = self._client.chat.completions.create(
@@ -217,16 +221,22 @@ class OpenAIAnswerScoreProvider:
                     {
                         "role": "system",
                         "content": (
-                            "You are Answer Arena V0.3, a Chinese interview "
+                            "You are Answer Arena V0.4, a candidate-aware Chinese interview "
                             "answer coach for a private SDET practice app. "
                             "Return strict JSON only. Do not wrap JSON in "
                             "Markdown or code fences. Give complete, example-first "
-                            "coaching, not abstract advice."
+                            "coaching, not abstract advice. Always respect the candidate "
+                            "profile and do not package the user as a Java backend or "
+                            "algorithm expert."
                         ),
                     },
                     {
                         "role": "user",
-                        "content": self._build_prompt(card, user_answer),
+                        "content": self._build_prompt(
+                            card,
+                            user_answer,
+                            depth=depth,
+                        ),
                     },
                 ],
             )
@@ -288,15 +298,48 @@ class OpenAIAnswerScoreProvider:
 
         return parse_ai_score_payload(payload, provider=self.provider_name)
 
-    def _build_prompt(self, card: KnowledgeCard, user_answer: str) -> str:
+    def _build_prompt(
+        self,
+        card: KnowledgeCard,
+        user_answer: str,
+        *,
+        depth: ScoringDepth = "quick",
+    ) -> str:
         dimensions = ", ".join(ANSWER_SCORE_DIMENSIONS)
         category = (
             card.category.value if hasattr(card.category, "value") else str(card.category)
         )
+        if depth == "deep":
+            depth_rules = (
+                "Depth: ai_deep / 深度教练。\n"
+                "Keep V0.3 full coaching ability.\n"
+                "- complete_answer: 180-350 Chinese characters.\n"
+                "- concrete_examples: 1-2 key examples with code, SQL, selector, HTTP, pytest, project template, or STAR where relevant.\n"
+                "- interview_answer_60s: 180-260 Chinese characters.\n"
+                "- interview_answer_30s: 80-120 Chinese characters.\n"
+                "- follow_up_questions: exactly 3.\n"
+                "- follow_up_qas: exactly 3, each with Q and A; answer length 60-120 Chinese characters.\n"
+                "- next_practice_step: one specific next action.\n"
+            )
+        else:
+            depth_rules = (
+                "Depth: ai_quick / AI快评。\n"
+                "Output should be fast, short, concrete, and suitable for daily drilling.\n"
+                "- complete_answer: empty or within 120-180 Chinese characters.\n"
+                "- concrete_examples: exactly 1 key example.\n"
+                "- interview_answer_60s: empty or brief.\n"
+                "- interview_answer_30s: 80-120 Chinese characters.\n"
+                "- follow_up_questions: derive from follow_up_qas if useful.\n"
+                "- follow_up_qas: exactly 2, each with Q and A; answer length 60-120 Chinese characters.\n"
+                "- Do not produce a long report.\n"
+            )
         return (
             "请用中文评分并教练这次面试回答。Use integer dimension scores "
             "from 0 to 10 and total_score from 0 to 100.\n"
             f"Required dimensions: {dimensions}.\n"
+            f"{CANDIDATE_PROFILE}\n\n"
+            f"{CANDIDATE_ANSWER_RULES}\n\n"
+            f"{depth_rules}\n"
             "Return JSON with exactly these semantic fields: total_score, "
             "dimension_scores, strengths, problems, risk_expressions, suggestions, "
             "optimized_answer_30s, memory_labels, missing_points, complete_answer, "
@@ -307,21 +350,25 @@ class OpenAIAnswerScoreProvider:
             "follow_up_questions, and follow_up_qas.\n"
             "New coaching fields must follow these rules:\n"
             "- missing_points: list the user's most specific gaps.\n"
-            "- complete_answer: give a full reference answer, not an outline, "
-            "controlled to 180-350 Chinese characters.\n"
-            "- concrete_examples: provide 1-2 key concrete examples. Technical topics "
+            "- complete_answer: give a direct answer when requested by depth rules, not an outline.\n"
+            "- concrete_examples: provide key concrete examples. Technical topics "
             "must include code, SQL, CSS Selector, XPath, HTTP request, logs, test "
             "cases, pytest example, or CI pipeline where relevant.\n"
-            "- interview_answer_60s: a natural one-minute answer the user can say "
-            "out loud, following conclusion -> concept -> example -> project link "
-            "-> risk boundary -> summary. Keep it 180-260 Chinese characters.\n"
-            "- interview_answer_30s: concise spoken answer under 120 Chinese "
-            "characters when possible, ideally 80-120 Chinese characters.\n"
-            "- follow_up_questions: exactly 3 concrete interviewer follow-up questions.\n"
-            "- follow_up_qas: exactly 3 strings. Each string must contain one Q and "
-            "one A. Format: Q：question\\nA：60-120 Chinese character answer. The "
+            "- interview_answer_60s: a natural answer the user can say out loud.\n"
+            "- interview_answer_30s: concise spoken answer, ideally 80-120 Chinese characters.\n"
+            "- follow_up_questions: concrete interviewer follow-up questions.\n"
+            "- follow_up_qas: strings. Each string must contain one Q and "
+            "one A. Format: Q：question\\nA：short Chinese answer. The "
             "answer must be specific and directly speakable.\n"
             "- next_practice_step: one specific next exercise action.\n\n"
+            "偏开发题候选人画像处理：\n"
+            "When the topic is Java backend, multithreading, JVM, Spring, algorithm, "
+            "or deep framework internals, do not package the user as a Java backend "
+            "developer. Use this structure: 1) basic correct concept, 2) honest "
+            "candidate boundary, 3) test-development angle, 4) speakable version. "
+            "The answer must include 测试开发视角 such as concurrent API testing, "
+            "load testing, data consistency, debugging, automation framework, logs, "
+            "database assertions, or CI.\n\n"
             "题型专项规则：\n"
             "1. Python题：必须给 Python 代码例子。\n"
             "2. SQL题：必须给 SQL 示例。\n"

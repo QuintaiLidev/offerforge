@@ -582,7 +582,8 @@ APP_HTML = """<!doctype html>
           placeholder="先写下或粘贴你的回答，再点击答题评分"
         ></textarea>
         <button id="scoreAnswerButton" class="answer-score-button" type="button">答题评分</button>
-        <button id="aiScoreAnswerButton" class="answer-score-button" type="button">AI评分</button>
+        <button id="aiScoreAnswerButton" class="answer-score-button" type="button">AI快评</button>
+        <button id="deepScoreAnswerButton" class="answer-score-button" type="button">深度教练</button>
         <div id="scoreResult" class="score-result" aria-live="polite"></div>
       </div>
 
@@ -645,6 +646,7 @@ APP_HTML = """<!doctype html>
       answerInput: document.querySelector("#answerInput"),
       scoreAnswerButton: document.querySelector("#scoreAnswerButton"),
       aiScoreAnswerButton: document.querySelector("#aiScoreAnswerButton"),
+      deepScoreAnswerButton: document.querySelector("#deepScoreAnswerButton"),
       scoreResult: document.querySelector("#scoreResult"),
       ratingButtons: Array.from(document.querySelectorAll("[data-rating]")),
       doneLoadingText: document.querySelector("#doneLoadingText"),
@@ -656,7 +658,8 @@ APP_HTML = """<!doctype html>
     };
 
     elements.scoreAnswerButton.textContent = "规则评分";
-    elements.aiScoreAnswerButton.textContent = "AI评分";
+    elements.aiScoreAnswerButton.textContent = "AI快评";
+    elements.deepScoreAnswerButton.textContent = "深度教练";
 
     function setText(element, value) {
       element.textContent = value || "";
@@ -778,6 +781,7 @@ APP_HTML = """<!doctype html>
       elements.showAnswerButton.disabled = disabled;
       elements.scoreAnswerButton.disabled = disabled || state.scoring;
       elements.aiScoreAnswerButton.disabled = disabled || state.scoring;
+      elements.deepScoreAnswerButton.disabled = disabled || state.scoring;
       elements.ratingButtons.forEach((button) => {
         if (!button.dataset.originalText) {
           button.dataset.originalText = button.textContent;
@@ -1233,13 +1237,46 @@ APP_HTML = """<!doctype html>
 
     function formatScoreFailureMessage(error, mode) {
       const detail = error instanceof Error ? error.message : String(error);
-      if (mode === "ai" && /request timed out|AbortError/i.test(detail)) {
-        return "AI评分超时：完整答案生成较慢，请稍后重试或换稳定网络。";
+      if (mode === "ai_quick" && /request timed out|AbortError/i.test(detail)) {
+        return "AI快评超时：模型响应较慢，请稍后重试或改用规则评分。";
       }
-      if (mode === "ai" && /Load failed|TypeError|request failed/i.test(detail)) {
-        return "AI评分请求失败：网络连接中断或服务暂时不可用，请稍后重试。";
+      if (mode === "ai_deep" && /request timed out|AbortError/i.test(detail)) {
+        return "深度教练超时：完整答案生成较慢，请稍后重试或换稳定网络。";
+      }
+      if (mode === "ai_quick" && /Load failed|TypeError|request failed/i.test(detail)) {
+        return "AI快评请求失败：网络连接中断或服务暂时不可用，请稍后重试。";
+      }
+      if (mode === "ai_deep" && /Load failed|TypeError|request failed/i.test(detail)) {
+        return "深度教练请求失败：网络连接中断或服务暂时不可用，请稍后重试。";
       }
       return `评分失败：${detail}`;
+    }
+
+    function getScoreRequestMode(mode) {
+      if (mode === "ai") {
+        return "ai_quick";
+      }
+      return mode;
+    }
+
+    function getScoreTimeoutMs(mode) {
+      if (mode === "ai_deep") {
+        return 90000;
+      }
+      if (mode === "ai_quick" || mode === "ai") {
+        return 30000;
+      }
+      return 15000;
+    }
+
+    function getScoreLoadingText(mode) {
+      if (mode === "ai_deep") {
+        return "深度教练中，完整答案可能需要 30-90 秒...";
+      }
+      if (mode === "ai_quick" || mode === "ai") {
+        return "AI快评中，预计 10-30 秒...";
+      }
+      return "规则评分中...";
     }
 
     function hasScoreContent(content) {
@@ -1349,38 +1386,42 @@ APP_HTML = """<!doctype html>
         return;
       }
       state.scoring = true;
+      const requestMode = getScoreRequestMode(mode);
       const activeScoreButton =
-        mode === "ai" ? elements.aiScoreAnswerButton : elements.scoreAnswerButton;
+        requestMode === "ai_deep"
+          ? elements.deepScoreAnswerButton
+          : requestMode === "ai_quick"
+            ? elements.aiScoreAnswerButton
+            : elements.scoreAnswerButton;
       elements.scoreAnswerButton.disabled = true;
       elements.aiScoreAnswerButton.disabled = true;
-      activeScoreButton.textContent =
-        mode === "ai" ? "AI评分中，完整答案可能需要 30-90 秒..." : "规则评分中...";
-      if (mode === "ai") {
-        elements.scoreAnswerButton.textContent = "规则评分";
-      }
+      elements.deepScoreAnswerButton.disabled = true;
+      activeScoreButton.textContent = getScoreLoadingText(requestMode);
 
       try {
         const score = await fetchJson("/api/v1/answer-arena/score", {
           method: "POST",
-          timeoutMs: mode === "ai" ? 90000 : 15000,
+          timeoutMs: getScoreTimeoutMs(requestMode),
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({
             card_id: state.currentCard.id,
             user_answer: answerText,
-            mode,
+            mode: requestMode,
           }),
         });
         renderScoreResult(score);
       } catch (error) {
-        const message = formatScoreFailureMessage(error, mode);
+        const message = formatScoreFailureMessage(error, requestMode);
         showError(message);
         renderScoreError(message);
       } finally {
         state.scoring = false;
         elements.scoreAnswerButton.disabled = false;
         elements.aiScoreAnswerButton.disabled = false;
+        elements.deepScoreAnswerButton.disabled = false;
         elements.scoreAnswerButton.textContent = "规则评分";
-        elements.aiScoreAnswerButton.textContent = "AI评分";
+        elements.aiScoreAnswerButton.textContent = "AI快评";
+        elements.deepScoreAnswerButton.textContent = "深度教练";
       }
     }
 
@@ -1429,7 +1470,8 @@ APP_HTML = """<!doctype html>
 
     elements.showAnswerButton.addEventListener("click", toggleAnswer);
     elements.scoreAnswerButton.addEventListener("click", () => scoreCurrentAnswer("rule"));
-    elements.aiScoreAnswerButton.addEventListener("click", () => scoreCurrentAnswer("ai"));
+    elements.aiScoreAnswerButton.addEventListener("click", () => scoreCurrentAnswer("ai_quick"));
+    elements.deepScoreAnswerButton.addEventListener("click", () => scoreCurrentAnswer("ai_deep"));
     elements.editCurrentCardButton.addEventListener("click", () => {
       if (state.currentCard) {
         toggleCardEditor(state.currentCard, elements.currentEditContainer);

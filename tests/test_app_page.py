@@ -53,24 +53,33 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "scoreCurrentAnswer" in response.text
     assert "规则评分" in response.text
     assert "aiScoreAnswerButton" in response.text
-    assert "AI评分" in response.text
+    assert "AI快评" in response.text
+    assert "deepScoreAnswerButton" in response.text
+    assert "深度教练" in response.text
     assert 'scoreCurrentAnswer("rule")' in response.text
-    assert 'scoreCurrentAnswer("ai")' in response.text
+    assert 'scoreCurrentAnswer("ai_quick")' in response.text
+    assert 'scoreCurrentAnswer("ai_deep")' in response.text
     assert 'addEventListener("click", scoreCurrentAnswer)' not in response.text
     assert "请至少输入 30 字回答后再评分" in response.text
     assert "AbortController" in response.text
     assert "timeoutMs" in response.text
     assert "90000" in response.text
-    assert "AI评分中，完整答案可能需要 30-90 秒..." in response.text
-    assert "AI评分超时：完整答案生成较慢，请稍后重试或换稳定网络。" in response.text
-    assert "AI评分请求失败：网络连接中断或服务暂时不可用，请稍后重试。" in response.text
+    assert "30000" in response.text
+    assert "AI快评中，预计 10-30 秒..." in response.text
+    assert "深度教练中，完整答案可能需要 30-90 秒..." in response.text
+    assert "AI快评超时：模型响应较慢，请稍后重试或改用规则评分。" in response.text
+    assert "深度教练超时：完整答案生成较慢，请稍后重试或换稳定网络。" in response.text
+    assert "AI快评请求失败：网络连接中断或服务暂时不可用，请稍后重试。" in response.text
+    assert "深度教练请求失败：网络连接中断或服务暂时不可用，请稍后重试。" in response.text
+    assert "getScoreRequestMode" in response.text
+    assert "getScoreTimeoutMs" in response.text
     assert "formatScoreFailureMessage" in response.text
     assert "Load failed" in response.text
     assert "TypeError" in response.text
     assert "request timed out after" in response.text
     assert "window.clearTimeout(timeoutId)" in response.text
     assert "setLoading(false)" in response.text
-    assert "mode," in response.text
+    assert "mode: requestMode" in response.text
     assert "provider:" in response.text
     assert "你这次回答缺什么" in response.text
     assert "完整参考答案" in response.text

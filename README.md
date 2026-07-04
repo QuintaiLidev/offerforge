@@ -208,6 +208,7 @@ Practice history: `/app` can show recent practice attempts, including rating, us
 Answer Arena V0.1: `/app` supports rule-based answer scoring before submitting a practice rating.
 Answer Arena V0.2: rule scoring remains the default; optional AI scoring uses `mode=ai` with `OFFERFORGE_AI_SCORE_BACKEND=openai|openrouter`. OpenAI uses `OPENAI_API_KEY`; OpenRouter uses `OPENROUTER_API_KEY`, `OFFERFORGE_OPENROUTER_MODEL`, optional `OFFERFORGE_OPENROUTER_SITE_URL`, and `OFFERFORGE_OPENROUTER_APP_TITLE`. Scores are not saved and scheduling is unchanged.
 Answer Arena V0.3: AI scoring also returns example-first coaching fields, including missing points, a complete answer, concrete examples, 60s/30s spoken answers, follow-up questions with short answers, and the next practice step. Full-answer mode is longer; set `OFFERFORGE_AI_SCORE_TIMEOUT_SECONDS=90` for hosted AI scoring.
+Answer Arena V0.4: scoring is candidate-aware for the user's test-development/SDET transition profile. Use `mode=rule` for local fast scoring, `mode=ai_quick` for daily OpenAI/OpenRouter quick feedback with a 30s frontend timeout, and `mode=ai_deep` for full coaching with a 90s frontend timeout. Legacy `mode=ai` maps to quick feedback.
 
 Card editing: `/app` supports editing card title, question, core knowledge, reference answer, and tags.
 
