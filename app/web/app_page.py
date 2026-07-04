@@ -64,12 +64,6 @@ APP_HTML = """<!doctype html>
       letter-spacing: 0;
     }
 
-    header p {
-      margin-top: 6px;
-      color: var(--muted);
-      font-size: 1rem;
-    }
-
     .tab-bar {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -567,7 +561,6 @@ APP_HTML = """<!doctype html>
   <main>
     <header>
       <h1>OfferForge</h1>
-      <p>今日复习</p>
     </header>
 
     <nav class="tab-bar" aria-label="复习模块">
@@ -710,6 +703,7 @@ APP_HTML = """<!doctype html>
     elements.scoreAnswerButton.textContent = "规则评分";
     elements.aiScoreAnswerButton.textContent = "AI快评";
     elements.deepScoreAnswerButton.textContent = "深度教练";
+    let successMessageTimer = null;
 
     function setText(element, value) {
       element.textContent = value || "";
@@ -813,12 +807,18 @@ APP_HTML = """<!doctype html>
       elements.errorMessage.classList.remove("visible");
     }
 
-    function showSuccess(message) {
+    function showSuccess(message, durationMs = 1800) {
+      window.clearTimeout(successMessageTimer);
       setText(elements.successMessage, message);
       elements.successMessage.classList.add("visible");
+      successMessageTimer = window.setTimeout(() => {
+        clearSuccess();
+      }, durationMs);
     }
 
     function clearSuccess() {
+      window.clearTimeout(successMessageTimer);
+      successMessageTimer = null;
       setText(elements.successMessage, "");
       elements.successMessage.classList.remove("visible");
     }
@@ -846,6 +846,9 @@ APP_HTML = """<!doctype html>
 
     function setActiveTab(tabName) {
       state.activeTab = tabName;
+      if (tabName !== "today") {
+        clearSuccess();
+      }
       elements.todayReviewPanel.classList.toggle("hidden", tabName !== "today");
       elements.doneTodayPanel.classList.toggle("hidden", tabName !== "done");
       elements.historyPanel.classList.toggle("hidden", tabName !== "history");

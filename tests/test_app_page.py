@@ -45,6 +45,9 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "OfferForge" in response.text
+    assert "<header>\n      <h1>OfferForge</h1>\n    </header>" in response.text
+    header_body = response.text.split("<header>", 1)[1].split("</header>", 1)[0]
+    assert "<p>今日复习</p>" not in header_body
     assert "练习历史" in response.text
     assert "review-section-title" in response.text
     assert "historyList" in response.text
@@ -120,6 +123,12 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert 'data-tab-panel="history"' in response.text
     assert 'activeTab: "today"' in response.text
     assert "function setActiveTab(tabName)" in response.text
+    assert "let successMessageTimer = null" in response.text
+    assert "function showSuccess(message, durationMs = 1800)" in response.text
+    assert "successMessageTimer = window.setTimeout(() =>" in response.text
+    assert "function clearSuccess()" in response.text
+    assert "window.clearTimeout(successMessageTimer)" in response.text
+    assert "successMessageTimer = null" in response.text
     assert 'elements.todayReviewPanel.classList.toggle("hidden", tabName !== "today")' in response.text
     assert 'elements.doneTodayPanel.classList.toggle("hidden", tabName !== "done")' in response.text
     assert 'elements.historyPanel.classList.toggle("hidden", tabName !== "history")' in response.text
@@ -130,6 +139,8 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
         1,
     )[0]
     assert "answerInput.value" not in set_active_tab_body
+    assert 'if (tabName !== "today")' in set_active_tab_body
+    assert "clearSuccess();" in set_active_tab_body
     assert "查看答案" in response.text
     assert "答案内容" in response.text
     assert "调度信息" in response.text
