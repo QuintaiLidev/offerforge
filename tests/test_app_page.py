@@ -65,6 +65,17 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
     assert "setLoading(false)" in response.text
     assert "mode," in response.text
     assert "provider:" in response.text
+    assert "你这次回答缺什么" in response.text
+    assert "完整参考答案" in response.text
+    assert "具体例子" in response.text
+    assert "60秒面试口述版" in response.text
+    assert "30秒精简版" in response.text
+    assert "面试官可能追问" in response.text
+    assert "下一步练习建议" in response.text
+    assert "score-example-pre" in response.text
+    assert "createOptionalScoreBlock" in response.text
+    assert "interview_answer_30s" in response.text
+    assert "optimized_answer_30s" in response.text
     assert "/api/v1/answer-arena/score" in response.text
     assert "renderScoreResult" in response.text
     assert "编辑卡片" in response.text

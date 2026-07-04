@@ -140,6 +140,15 @@ class FakeAiProvider:
             suggestions=["keep it concise"],
             optimized_answer_30s="AI optimized answer.",
             memory_labels=["ai"],
+            missing_points=["缺少具体例子"],
+            complete_answer="完整参考答案：先给结论，再结合接口自动化项目说明验证链路和风险边界。",
+            concrete_examples=[
+                "pytest 示例：\nassert response.status_code == 200\nassert response.json()['code'] == '0000'"
+            ],
+            interview_answer_60s="我会先说明结论，再讲接口、数据和项目落点，最后补充风险边界。",
+            interview_answer_30s="接口自动化要验证响应、数据库和业务状态，并说明风险边界。",
+            follow_up_questions=["你怎么做数据库断言？", "接口失败怎么定位？"],
+            next_practice_step="下次用 login -> create_user -> db assert 讲一遍项目链路。",
         )
 
 
@@ -155,6 +164,13 @@ class FakeOpenRouterProvider:
             suggestions=["keep it concise"],
             optimized_answer_30s="OpenRouter optimized answer.",
             memory_labels=["openrouter"],
+            missing_points=["缺少真实项目表达"],
+            complete_answer="完整参考答案：结合 OfferForge 和接口自动化项目说明做法、验证和边界。",
+            concrete_examples=["SQL 断言示例：\nselect status from users where id = :user_id;"],
+            interview_answer_60s="我会用一分钟讲清目标、实现、验证和风险边界。",
+            interview_answer_30s="用项目链路说明测试开发能力，重点讲验证闭环。",
+            follow_up_questions=["这个项目怎么证明不是玩具？"],
+            next_practice_step="下次用 30 秒讲清 SQL 断言层。",
         )
 
 
@@ -215,6 +231,13 @@ async def test_score_api_ai_mode_uses_mocked_provider(
     data = response.json()
     assert data["provider"] == "openai"
     assert data["total_score"] == 91
+    assert data["missing_points"] == ["缺少具体例子"]
+    assert data["complete_answer"].startswith("完整参考答案")
+    assert "assert response.status_code == 200" in data["concrete_examples"][0]
+    assert data["interview_answer_60s"].startswith("我会先说明结论")
+    assert data["interview_answer_30s"].startswith("接口自动化")
+    assert data["follow_up_questions"] == ["你怎么做数据库断言？", "接口失败怎么定位？"]
+    assert data["next_practice_step"].startswith("下次用 login")
     assert db_session.scalar(
         select(PracticeAttempt).where(PracticeAttempt.knowledge_card_id == card.id)
     ) is None

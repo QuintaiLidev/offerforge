@@ -38,3 +38,10 @@ class AnswerScoreResponse(SchemaModel):
     suggestions: list[str]
     optimized_answer_30s: str
     memory_labels: list[str]
+    missing_points: list[str] = Field(default_factory=list)
+    complete_answer: str | None = None
+    concrete_examples: list[str] = Field(default_factory=list)
+    interview_answer_60s: str | None = None
+    interview_answer_30s: str | None = None
+    follow_up_questions: list[str] = Field(default_factory=list)
+    next_practice_step: str | None = None

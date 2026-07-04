@@ -283,6 +283,104 @@ def test_ai_score_payload_parser_rejects_missing_dimensions() -> None:
         )
 
 
+def test_ai_score_payload_parser_accepts_coaching_fields() -> None:
+    payload = {
+        "total_score": 90,
+        "dimension_scores": {
+            dimension: 8 for dimension in ANSWER_SCORE_DIMENSIONS
+        },
+        "strengths": ["结构清晰"],
+        "problems": ["缺少项目落点"],
+        "risk_expressions": [],
+        "suggestions": ["补一个接口自动化例子"],
+        "optimized_answer_30s": "30 秒旧字段答案",
+        "memory_labels": ["项目表达"],
+        "missing_points": ["缺少具体例子"],
+        "complete_answer": "完整参考答案：先给结论，再讲接口自动化链路和风险边界。",
+        "concrete_examples": [
+            "pytest 示例：\nassert response.status_code == 200"
+        ],
+        "interview_answer_60s": "一分钟口述版：我会先说结论，再给例子。",
+        "interview_answer_30s": "三十秒精简版：结论、例子、边界。",
+        "follow_up_questions": ["你怎么做 SQL 断言？"],
+        "next_practice_step": "下次用 login -> db assert 讲一遍。",
+    }
+
+    result = parse_ai_score_payload(payload, provider="openrouter")
+
+    assert result.provider == "openrouter"
+    assert result.missing_points == ["缺少具体例子"]
+    assert result.complete_answer.startswith("完整参考答案")
+    assert "assert response.status_code == 200" in result.concrete_examples[0]
+    assert result.interview_answer_60s.startswith("一分钟口述版")
+    assert result.interview_answer_30s.startswith("三十秒精简版")
+    assert result.follow_up_questions == ["你怎么做 SQL 断言？"]
+    assert result.next_practice_step == "下次用 login -> db assert 讲一遍。"
+
+
+def test_ai_score_payload_parser_defaults_missing_coaching_fields() -> None:
+    result = parse_ai_score_payload(
+        {
+            "total_score": 80,
+            "dimension_scores": {
+                dimension: 7 for dimension in ANSWER_SCORE_DIMENSIONS
+            },
+            "strengths": [],
+            "problems": [],
+            "risk_expressions": [],
+            "suggestions": [],
+            "optimized_answer_30s": "fallback answer",
+            "memory_labels": [],
+        },
+        provider="openai",
+    )
+
+    assert result.missing_points == []
+    assert result.complete_answer is None
+    assert result.concrete_examples == []
+    assert result.interview_answer_60s is None
+    assert result.interview_answer_30s is None
+    assert result.follow_up_questions == []
+    assert result.next_practice_step is None
+
+
+def test_openai_prompt_requires_example_first_coaching_by_topic(db_session) -> None:
+    provider = OpenAIAnswerScoreProvider.__new__(OpenAIAnswerScoreProvider)
+    python_card = create_card(
+        db_session,
+        title="Python fixture 怎么写？",
+        category=KnowledgeCategory.PYTHON,
+    )
+    ui_card = create_card(
+        db_session,
+        title="UI 自动化元素怎么定位？",
+        category=KnowledgeCategory.SELENIUM,
+    )
+    project_card = create_card(
+        db_session,
+        title="介绍服务端接口自动化项目",
+        category=KnowledgeCategory.PROJECT_EXPLANATION,
+    )
+    hr_card = create_card(
+        db_session,
+        title="为什么从功能测试转测试开发？",
+        category=KnowledgeCategory.HR_INTERVIEW,
+    )
+
+    python_prompt = provider._build_prompt(python_card, "answer")
+    ui_prompt = provider._build_prompt(ui_card, "answer")
+    project_prompt = provider._build_prompt(project_card, "answer")
+    hr_prompt = provider._build_prompt(hr_card, "answer")
+
+    assert "必须给 Python 代码例子" in python_prompt
+    assert "CSS Selector / XPath 示例" in ui_prompt
+    assert "真实项目表达模板" in project_prompt
+    assert "STAR 结构" in hr_prompt
+    assert "complete_answer" in project_prompt
+    assert "interview_answer_60s" in project_prompt
+    assert "next_practice_step" in project_prompt
+
+
 class FakeAuthenticationError(Exception):
     pass
 

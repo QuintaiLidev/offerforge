@@ -239,6 +239,17 @@ APP_HTML = """<!doctype html>
       padding: 0;
     }
 
+    .score-example-pre {
+      margin: 8px 0 10px;
+      padding: 10px;
+      border: 1px solid #dfe7ff;
+      border-radius: 8px;
+      background: #ffffff;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font: 0.92rem/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
     .score-risk {
       color: var(--danger);
       font-weight: 700;
@@ -1220,6 +1231,43 @@ APP_HTML = """<!doctype html>
       return block;
     }
 
+    function hasScoreContent(content) {
+      if (Array.isArray(content)) {
+        return content.some((item) => String(item || "").trim());
+      }
+      return Boolean(String(content || "").trim());
+    }
+
+    function createOptionalScoreBlock(title, content, preformatted = false) {
+      if (!hasScoreContent(content)) {
+        return null;
+      }
+      const block = document.createElement("div");
+      const heading = document.createElement("strong");
+      heading.textContent = title;
+      block.appendChild(heading);
+
+      if (Array.isArray(content)) {
+        if (preformatted) {
+          content
+            .filter((item) => String(item || "").trim())
+            .forEach((item) => {
+              const pre = document.createElement("pre");
+              pre.className = "score-example-pre";
+              pre.textContent = item;
+              block.appendChild(pre);
+            });
+        } else {
+          block.appendChild(createList(content));
+        }
+      } else {
+        const paragraph = document.createElement("p");
+        paragraph.textContent = content;
+        block.appendChild(paragraph);
+      }
+      return block;
+    }
+
     function renderScoreResult(score) {
       const title = document.createElement("h3");
       title.textContent = `总分：${score.total_score}/100`;
@@ -1231,6 +1279,19 @@ APP_HTML = """<!doctype html>
         ([name, value]) => `${formatValue(name)}：${value}/10`
       );
 
+      const compactAnswer =
+        score.interview_answer_30s ||
+        (score.provider === "rule" ? "" : score.optimized_answer_30s || "");
+      const coachingBlocks = [
+        createOptionalScoreBlock("你这次回答缺什么", score.missing_points || []),
+        createOptionalScoreBlock("完整参考答案", score.complete_answer || ""),
+        createOptionalScoreBlock("具体例子", score.concrete_examples || [], true),
+        createOptionalScoreBlock("60秒面试口述版", score.interview_answer_60s || ""),
+        createOptionalScoreBlock("30秒精简版", compactAnswer),
+        createOptionalScoreBlock("面试官可能追问", score.follow_up_questions || []),
+        createOptionalScoreBlock("下一步练习建议", score.next_practice_step || ""),
+      ].filter(Boolean);
+
       elements.scoreResult.replaceChildren(
         title,
         provider,
@@ -1240,7 +1301,8 @@ APP_HTML = """<!doctype html>
         createScoreBlock("风险表达", score.risk_expressions || []),
         createScoreBlock("优化建议", score.suggestions || []),
         createScoreBlock("30 秒优化版", score.optimized_answer_30s || ""),
-        createScoreBlock("记忆标签", score.memory_labels || [])
+        createScoreBlock("记忆标签", score.memory_labels || []),
+        ...coachingBlocks
       );
 
       elements.scoreResult.querySelectorAll("div:nth-of-type(4) li").forEach((item) => {
