@@ -1,0 +1,27 @@
+{
+  "name": "offerforge",
+  "version": "1.0.0",
+  "description": "OfferForge 是一个本地优先的 Web 应用，用于把 Python、SQL、API/pytest、UI 自动化、项目与面试输出等高频能力做成长期可调用的复习与训练工具。产品范围来自 `offerforge_scope.md`，但不会设计成固定按 Day 1、Day 2 推进的课程表。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QuintaiLidev/offerforge.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/QuintaiLidev/offerforge/issues"
+  },
+  "homepage": "https://github.com/QuintaiLidev/offerforge#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.62.0",
+    "@types/node": "^26.1.1"
+  }
+}
