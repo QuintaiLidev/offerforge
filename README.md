@@ -243,6 +243,26 @@ The file contains 95 cards for interview replay, resume projects, debugging, UI 
 
 On startup, OfferForge can auto-import `data_seed/cards_seed_week1_interview_v3.json` when the knowledge card table is empty. This helps restore the 95-card seed set after a Render free-environment redeploy or restart clears SQLite data. Existing cards are never duplicated, and this only restores knowledge cards, not practice attempts or today-done records. Auto seed is best-effort: missing files, validation failures, or import errors are logged and should not block health checks. Set `OFFERFORGE_AUTO_SEED_ON_STARTUP=false` to disable it, or override the file with `OFFERFORGE_AUTO_SEED_PATH`.
 
+## Playwright E2E Tests
+
+OfferForge includes a small Playwright Test suite written in TypeScript.
+
+Current coverage:
+
+- Application smoke test and review-tab switching
+- Mocked rule-scoring flow with request-body validation
+- Practice submission flow with duplicate-submit protection
+- Automatic FastAPI startup through Playwright `webServer`
+- HTML report, failure screenshots, and retained traces
+
+Run the suite:
+
+```bash
+npm install
+npx.cmd playwright test --project=chromium
+npx.cmd playwright show-report
+npx.cmd playwright install chromium
+
 ## 移动端兼容预留原则
 
 后续正式业务前端使用原生 HTML、CSS、JavaScript。页面采用 mobile-first 或响应式设计，支持常见手机浏览器，按钮和输入区域适合触屏操作，不依赖 hover 才能完成关键操作，不固定桌面端宽度。
