@@ -10,6 +10,7 @@ def test_default_host_and_port_are_local_only() -> None:
 
     assert settings.host == "127.0.0.1"
     assert settings.port == 8000
+    assert settings.app_name == "SkillLoop"
     assert settings.database_path == DEFAULT_DATABASE_PATH
     assert settings.database_url == f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}"
     assert settings.auto_seed_on_startup is True
@@ -21,7 +22,7 @@ def test_default_host_and_port_are_local_only() -> None:
     assert settings.openrouter_api_key is None
     assert settings.openrouter_model == "openai/gpt-4o-mini"
     assert settings.openrouter_site_url is None
-    assert settings.openrouter_app_title == "OfferForge"
+    assert settings.openrouter_app_title == "SkillLoop"
     assert settings.ai_score_timeout_seconds == 20
 
 
@@ -116,3 +117,23 @@ def test_ai_score_settings_can_be_loaded_from_environment() -> None:
     assert settings.openrouter_site_url == "https://offerforge.example"
     assert settings.openrouter_app_title == "OfferForge Test"
     assert settings.ai_score_timeout_seconds == 12
+
+
+def test_skillloop_environment_variables_take_priority_over_legacy_names(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "skillloop_test.db"
+
+    settings = load_settings(
+        {
+            "SKILLLOOP_APP_NAME": "SkillLoop Test",
+            "OFFERFORGE_APP_NAME": "Legacy Name",
+            "SKILLLOOP_TESTING": "true",
+            "SKILLLOOP_DATABASE_PATH": str(database_path),
+            "OFFERFORGE_DATABASE_PATH": str(tmp_path / "legacy.db"),
+        }
+    )
+
+    assert settings.app_name == "SkillLoop Test"
+    assert settings.testing is True
+    assert settings.database_path == database_path

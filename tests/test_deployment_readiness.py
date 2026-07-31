@@ -19,10 +19,10 @@ def test_env_example_documents_safe_deployment_variables() -> None:
         if line and not line.startswith("#") and "=" in line
     }
 
-    assert lines["OFFERFORGE_AUTH_ENABLED"] == "true"
-    assert lines["OFFERFORGE_AUTH_USERNAME"] == "change-me"
-    assert lines["OFFERFORGE_AUTH_PASSWORD"] == "change-me"
-    assert lines["OFFERFORGE_DATABASE_PATH"] == "./data/offerforge.db"
+    assert lines["SKILLLOOP_AUTH_ENABLED"] == "true"
+    assert lines["SKILLLOOP_AUTH_USERNAME"] == "change-me"
+    assert lines["SKILLLOOP_AUTH_PASSWORD"] == "change-me"
+    assert lines["SKILLLOOP_DATABASE_PATH"] == "./data/offerforge.db"
     assert "test-secret" not in content
     assert "please-change-this-password" not in content
 
@@ -34,10 +34,11 @@ def test_deployment_document_exists_and_covers_private_cloud_readiness() -> None
     assert "Basic Auth" in content
     assert "SQLite" in content
     assert "persistent disk" in content
-    assert "OFFERFORGE_AUTH_ENABLED" in content
-    assert "OFFERFORGE_AUTH_USERNAME" in content
-    assert "OFFERFORGE_AUTH_PASSWORD" in content
-    assert "OFFERFORGE_DATABASE_PATH" in content
+    assert "SKILLLOOP_AUTH_ENABLED" in content
+    assert "SKILLLOOP_AUTH_USERNAME" in content
+    assert "SKILLLOOP_AUTH_PASSWORD" in content
+    assert "SKILLLOOP_DATABASE_PATH" in content
+    assert "OFFERFORGE_*" in content
     assert "python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT" in content
     assert "GET /api/v1/health" in content
     assert "POST /api/v1/practice-attempts" in content
@@ -100,7 +101,7 @@ def test_database_path_configuration_remains_default_and_overridable(
     cloud_database_path = tmp_path / "offerforge.db"
     cloud_settings = load_settings(
         {
-            "OFFERFORGE_DATABASE_PATH": str(cloud_database_path),
+            "SKILLLOOP_DATABASE_PATH": str(cloud_database_path),
         }
     )
 

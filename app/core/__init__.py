@@ -1,1 +1,1 @@
-"""Core configuration package for OfferForge."""
+"""Core configuration package for SkillLoop."""

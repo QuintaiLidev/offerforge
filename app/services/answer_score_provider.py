@@ -379,7 +379,7 @@ class OpenAIAnswerScoreProvider:
             "Python + pytest + requests + YAML + PostgreSQL + GitHub Actions + "
             "Locust，以及 login -> create_user -> get_user -> update_user_status "
             "-> db assert 链路；也可结合 api-test-gen、API 安全测试用例生成器、"
-            "OfferForge，但不要编造没有依据的成果。\n"
+            "SkillLoop，但不要编造没有依据的成果。\n"
             "6. HR题：必须给 STAR 结构：S背景、T任务、A行动、R结果。\n"
             "7. 安全测试题：必须给风险、验证方法、边界表达。\n"
             "8. 故障定位题：必须给复现 -> 请求响应 -> 日志 -> 数据库 -> 环境 "
@@ -406,7 +406,7 @@ class OpenRouterAnswerScoreProvider(OpenAIAnswerScoreProvider):
         model: str,
         timeout_seconds: int,
         site_url: str | None = None,
-        app_title: str | None = "OfferForge",
+        app_title: str | None = "SkillLoop",
     ) -> None:
         headers: dict[str, str] = {}
         if site_url:

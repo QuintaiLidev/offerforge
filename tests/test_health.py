@@ -17,4 +17,4 @@ async def test_health_endpoint_returns_expected_payload() -> None:
             response = await client.get("/api/v1/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "OfferForge"}
+    assert response.json() == {"status": "ok", "service": "SkillLoop"}

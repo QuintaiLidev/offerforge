@@ -1,1 +1,1 @@
-"""Tests for OfferForge."""
+"""Tests for SkillLoop."""

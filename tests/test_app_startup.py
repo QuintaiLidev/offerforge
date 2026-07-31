@@ -13,7 +13,7 @@ def test_app_can_be_imported() -> None:
     application = create_app()
 
     assert isinstance(application, FastAPI)
-    assert application.title == "OfferForge"
+    assert application.title == "SkillLoop"
 
 
 @pytest.mark.anyio

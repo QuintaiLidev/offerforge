@@ -115,9 +115,9 @@ def test_execute_uses_mocked_bulk_api_without_real_network(
 
     monkeypatch.setattr(import_seed_cards, "request_json", fake_request_json)
     env = {
-        "OFFERFORGE_BASE_URL": "https://offerforge.example",
-        "OFFERFORGE_BASIC_AUTH_USERNAME": "offerforge",
-        "OFFERFORGE_BASIC_AUTH_PASSWORD": "test-password",
+        "SKILLLOOP_BASE_URL": "https://skillloop.example",
+        "SKILLLOOP_BASIC_AUTH_USERNAME": "skillloop",
+        "SKILLLOOP_BASIC_AUTH_PASSWORD": "test-password",
     }
 
     exit_code = import_seed_cards.main([str(TIDONG_SEED), "--execute"], environ=env)
@@ -129,9 +129,9 @@ def test_execute_uses_mocked_bulk_api_without_real_network(
     assert "test-password" not in captured.out
     assert "test-password" not in captured.err
     assert [call["method"] for call in calls] == ["GET", "POST"]
-    assert calls[0]["url"] == "https://offerforge.example/api/v1/cards/sources"
-    assert calls[1]["url"] == "https://offerforge.example/api/v1/cards/bulk"
-    assert calls[1]["username"] == "offerforge"
+    assert calls[0]["url"] == "https://skillloop.example/api/v1/cards/sources"
+    assert calls[1]["url"] == "https://skillloop.example/api/v1/cards/bulk"
+    assert calls[1]["username"] == "skillloop"
     assert calls[1]["password"] == "test-password"
 
 
@@ -188,7 +188,7 @@ def test_execute_requires_base_url(capsys: pytest.CaptureFixture[str]) -> None:
 
     captured = capsys.readouterr()
     assert exit_code == 1
-    assert "OFFERFORGE_BASE_URL is required for --execute." in captured.err
+    assert "SKILLLOOP_BASE_URL is required for --execute." in captured.err
     assert "test-password" not in captured.err
 
 
@@ -200,7 +200,7 @@ def test_execute_requires_basic_auth(capsys: pytest.CaptureFixture[str]) -> None
 
     captured = capsys.readouterr()
     assert exit_code == 1
-    assert "OFFERFORGE_BASIC_AUTH_USERNAME is required for --execute." in captured.err
+    assert "SKILLLOOP_BASIC_AUTH_USERNAME is required for --execute." in captured.err
 
 
 def test_error_output_masks_password(

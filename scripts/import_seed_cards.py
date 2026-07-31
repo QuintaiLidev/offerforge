@@ -72,8 +72,14 @@ def load_and_validate_seed(path: Path) -> ValidatedSeed:
     return ValidatedSeed(path=path, cards=validated_cards)
 
 
-def require_env(name: str, environ: dict[str, str]) -> str:
-    value = environ.get(name, "").strip()
+def require_env(
+    name: str,
+    environ: dict[str, str],
+    *,
+    legacy_name: str | None = None,
+) -> str:
+    selected_name = name if name in environ or legacy_name is None else legacy_name
+    value = environ.get(selected_name, "").strip()
     if not value:
         raise SeedImportError(f"{name} is required for --execute.")
     return value
@@ -84,7 +90,7 @@ def build_url(base_url: str, endpoint: str) -> str:
 
 
 def make_basic_auth_header(username: str, password: str) -> str:
-    raw = f"{username}:{password}".encode("utf-8")
+    raw = f"{username}:{password}".encode()
     return "Basic " + base64.b64encode(raw).decode("ascii")
 
 
@@ -183,9 +189,21 @@ def run_dry_run(seed: ValidatedSeed) -> None:
 
 
 def run_execute(seed: ValidatedSeed, environ: dict[str, str]) -> None:
-    base_url = require_env("OFFERFORGE_BASE_URL", environ)
-    username = require_env("OFFERFORGE_BASIC_AUTH_USERNAME", environ)
-    password = require_env("OFFERFORGE_BASIC_AUTH_PASSWORD", environ)
+    base_url = require_env(
+        "SKILLLOOP_BASE_URL",
+        environ,
+        legacy_name="OFFERFORGE_BASE_URL",
+    )
+    username = require_env(
+        "SKILLLOOP_BASIC_AUTH_USERNAME",
+        environ,
+        legacy_name="OFFERFORGE_BASIC_AUTH_USERNAME",
+    )
+    password = require_env(
+        "SKILLLOOP_BASIC_AUTH_PASSWORD",
+        environ,
+        legacy_name="OFFERFORGE_BASIC_AUTH_PASSWORD",
+    )
 
     assert_source_not_imported(
         base_url=base_url,
@@ -219,7 +237,7 @@ def mask_sensitive(text: str, secrets: list[str]) -> str:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Import OfferForge seed cards through the existing bulk API."
+        description="Import SkillLoop seed cards through the existing bulk API."
     )
     parser.add_argument("seed_path", type=Path, help="Path to seed JSON file.")
     mode = parser.add_mutually_exclusive_group()
@@ -239,7 +257,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None, environ: dict[str, str] | None = None) -> int:
     args = parse_args(argv)
     env = dict(os.environ if environ is None else environ)
-    password = env.get("OFFERFORGE_BASIC_AUTH_PASSWORD", "")
+    passwords = [
+        env.get("SKILLLOOP_BASIC_AUTH_PASSWORD", ""),
+        env.get("OFFERFORGE_BASIC_AUTH_PASSWORD", ""),
+    ]
     try:
         seed = load_and_validate_seed(args.seed_path)
         if args.execute:
@@ -247,7 +268,7 @@ def main(argv: list[str] | None = None, environ: dict[str, str] | None = None) -
         else:
             run_dry_run(seed)
     except SeedImportError as exc:
-        print(mask_sensitive(f"Error: {exc}", [password]), file=sys.stderr)
+        print(mask_sensitive(f"Error: {exc}", passwords), file=sys.stderr)
         return 1
     return 0
 

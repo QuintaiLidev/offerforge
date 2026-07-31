@@ -10,7 +10,7 @@ APP_HTML = """<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OfferForge</title>
+  <title>SkillLoop</title>
   <style>
     :root {
       color-scheme: light;
@@ -560,7 +560,7 @@ APP_HTML = """<!doctype html>
 <body>
   <main>
     <header>
-      <h1>OfferForge</h1>
+      <h1>SkillLoop</h1>
     </header>
 
     <nav class="tab-bar" aria-label="复习模块">
