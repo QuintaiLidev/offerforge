@@ -51,6 +51,26 @@ async def test_auth_disabled_allows_health_docs_openapi_and_cards(
     assert cards.status_code == 200
 
 
+async def test_openapi_uses_skillloop_product_title(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    for name in (
+        "SKILLLOOP_APP_NAME",
+        "OFFERFORGE_APP_NAME",
+        "SKILLLOOP_AUTH_ENABLED",
+        "OFFERFORGE_AUTH_ENABLED",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    get_settings.cache_clear()
+
+    async for client in make_client():
+        response = await client.get("/openapi.json")
+
+    assert response.status_code == 200
+    assert response.json()["info"]["title"] == "SkillLoop"
+
+
 async def test_auth_enabled_protects_docs_openapi_and_business_api(
     monkeypatch: pytest.MonkeyPatch,
     db_session: Session,

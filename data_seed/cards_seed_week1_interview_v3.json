@@ -396,13 +396,13 @@
     "source_reference": "interview-week1-v3"
   },
   {
-    "title": "OfferForge 项目怎么讲才不像玩具项目？",
+    "title": "SkillLoop 项目怎么讲才不像玩具项目？",
     "category": "project_explanation",
     "difficulty": "hard",
     "question_type": "knowledge",
     "core_knowledge": "个人产品要讲真实问题、闭环、部署和质量证明。",
-    "question": "OfferForge 是个人项目，怎么证明它不是玩具？",
-    "reference_answer": "我会说 OfferForge 来自真实面试复盘需求：把知识卡、今日复习、练习提交和五档评价做成闭环，并且有 FastAPI 后端、SQLite、Basic Auth、Render 部署、手机页面和自动化测试。它不是公司级平台，但能证明我能把需求、接口、页面、部署和测试串成可用 MVP。",
+    "question": "SkillLoop 是个人项目，怎么证明它不是玩具？",
+    "reference_answer": "我会说 SkillLoop 来自真实面试复盘需求：把知识卡、今日复习、练习提交和五档评价做成闭环，并且有 FastAPI 后端、SQLite、Basic Auth、Render 部署、手机页面和自动化测试。它不是公司级平台，但能证明我能把需求、接口、页面、部署和测试串成可用 MVP。",
     "scoring_rules": {},
     "tags": ["project_defense", "offerforge", "cloud_mvp"],
     "source_reference": "interview-week1-v3"
@@ -834,7 +834,7 @@
     "question_type": "knowledge",
     "core_knowledge": "云端 SQLite 和日志都需要关注磁盘空间。",
     "question": "服务报写入失败，你怎么排查磁盘空间？",
-    "reference_answer": "我会先用 df -h 看整体磁盘剩余空间，再用 du -sh data 或 du -sh logs 看目录大小。OfferForge 这种 SQLite 项目，云端如果磁盘不可持久或空间不足，数据库写入就可能失败。",
+    "reference_answer": "我会先用 df -h 看整体磁盘剩余空间，再用 du -sh data 或 du -sh logs 看目录大小。SkillLoop 这种 SQLite 项目，云端如果磁盘不可持久或空间不足，数据库写入就可能失败。",
     "scoring_rules": {},
     "tags": ["linux_commands", "disk", "sqlite", "deployment"],
     "source_reference": "interview-week1-v3"
@@ -1056,12 +1056,12 @@
     "source_reference": "interview-week1-v3"
   },
   {
-    "title": "OfferForge 手机本地访问失败，为什么转云端部署？",
+    "title": "SkillLoop 手机本地访问失败，为什么转云端部署？",
     "category": "http_api_testing",
     "difficulty": "medium",
     "question_type": "knowledge",
     "core_knowledge": "技术决策要围绕真实使用场景和稳定性取舍。",
-    "question": "为什么 OfferForge 后来从本地手机访问转到 Render 云端？",
+    "question": "为什么 SkillLoop 后来从本地手机访问转到 Render 云端？",
     "reference_answer": "我最初想让手机通过局域网访问本地 FastAPI，但受 IP、网络、系统防火墙和环境稳定性影响，体验不稳定。后来转向 Render 云端部署，配 Basic Auth，手机直接访问 /app。这个选择是为了让复习工具真正可用，而不是停留在本地能跑。",
     "scoring_rules": {},
     "tags": ["engineering_debug", "offerforge", "render", "mobile"],

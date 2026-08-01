@@ -196,10 +196,11 @@ def _read_product_env(
     default: str | None = None,
 ) -> str | None:
     """Read a SkillLoop setting with an OfferForge compatibility fallback."""
-    skillloop_name = f"SKILLLOOP_{suffix}"
-    if skillloop_name in environ:
-        return environ[skillloop_name]
-    return environ.get(f"OFFERFORGE_{suffix}", default)
+    for prefix in ("SKILLLOOP", "OFFERFORGE"):
+        value = environ.get(f"{prefix}_{suffix}")
+        if value is not None and value.strip():
+            return value
+    return default
 
 
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
