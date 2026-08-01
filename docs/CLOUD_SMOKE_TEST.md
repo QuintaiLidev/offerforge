@@ -2,7 +2,7 @@
 
 ## Goal
 
-Verify that OfferForge has moved from a local FastAPI study tool to a private
+Verify that SkillLoop has moved from a local FastAPI study tool to a private
 cloud MVP that works from a phone browser.
 
 The smoke test covers the minimum review loop:
@@ -50,5 +50,5 @@ Create card -> load /app today review -> show answer -> submit rating -> card st
 
 Cloud MVP smoke test passed.
 
-OfferForge has completed the minimum loop across local development, GitHub push,
+SkillLoop has completed the minimum loop across local development, GitHub push,
 Render deployment, phone access, and five-rating practice submission.

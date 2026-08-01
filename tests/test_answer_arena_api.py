@@ -195,7 +195,7 @@ class FakeOpenRouterProvider:
             optimized_answer_30s="OpenRouter optimized answer.",
             memory_labels=["openrouter"],
             missing_points=["缺少真实项目表达"],
-            complete_answer="完整参考答案：结合 OfferForge 和接口自动化项目说明做法、验证和边界。",
+            complete_answer="完整参考答案：结合 SkillLoop 和接口自动化项目说明做法、验证和边界。",
             concrete_examples=["SQL 断言示例：\nselect status from users where id = :user_id;"],
             interview_answer_60s="我会用一分钟讲清目标、实现、验证和风险边界。",
             interview_answer_30s="用项目链路说明测试开发能力，重点讲验证闭环。",

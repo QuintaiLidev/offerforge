@@ -1,6 +1,6 @@
 # Deployment
 
-OfferForge can be deployed as a private MVP for personal study. The intended
+SkillLoop can be deployed as a private MVP for personal study. The intended
 cloud use case is simple: open `/app` from a phone browser, review cards, submit
 practice attempts, and keep the SQLite database on persistent storage.
 
@@ -13,15 +13,17 @@ per-user permissions.
 Set these variables in the deployment platform before exposing the app:
 
 ```text
-OFFERFORGE_AUTH_ENABLED=true
-OFFERFORGE_AUTH_USERNAME=change-me
-OFFERFORGE_AUTH_PASSWORD=change-me
-OFFERFORGE_DATABASE_PATH=/persistent/offerforge/offerforge.db
+SKILLLOOP_AUTH_ENABLED=true
+SKILLLOOP_AUTH_USERNAME=change-me
+SKILLLOOP_AUTH_PASSWORD=change-me
+SKILLLOOP_DATABASE_PATH=/persistent/offerforge/offerforge.db
 ```
 
 Use a strong private username and password. The values above are placeholders.
 
-`OFFERFORGE_DATABASE_PATH` points SQLite at the database file. Locally, the
+`SKILLLOOP_DATABASE_PATH` points SQLite at the database file. Locally, the
+legacy `data/offerforge.db` filename is retained so the rename does not orphan
+existing data. Existing `OFFERFORGE_*` variables remain compatibility aliases. The
 default remains `data/offerforge.db`; in the cloud, point it at a mounted
 persistent disk or volume.
 
@@ -69,7 +71,7 @@ After deployment, verify:
 
 ## Platform Notes
 
-OfferForge is not tied to a single platform. Render, Railway, Fly.io, and
+SkillLoop is not tied to a single platform. Render, Railway, Fly.io, and
 similar services can work if they support:
 
 - Python 3.11+

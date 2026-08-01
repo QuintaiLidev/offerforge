@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import datetime, timedelta
+from datetime import datetime
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import Mock
@@ -759,7 +759,7 @@ async def test_health_endpoint_still_works(client: httpx.AsyncClient) -> None:
     response = await client.get("/api/v1/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "OfferForge"}
+    assert response.json() == {"status": "ok", "service": "SkillLoop"}
 
 
 async def test_router_uses_service_dependency(client: httpx.AsyncClient) -> None:

@@ -44,8 +44,8 @@ async def test_app_page_auth_disabled_returns_mobile_review_page(
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "OfferForge" in response.text
-    assert "<header>\n      <h1>OfferForge</h1>\n    </header>" in response.text
+    assert "SkillLoop" in response.text
+    assert "<header>\n      <h1>SkillLoop</h1>\n    </header>" in response.text
     header_body = response.text.split("<header>", 1)[1].split("</header>", 1)[0]
     assert "<p>今日复习</p>" not in header_body
     assert "练习历史" in response.text
@@ -216,7 +216,7 @@ async def test_app_page_auth_enabled_protects_app_but_not_health(
     assert app_without_auth.status_code == 401
     assert app_without_auth.headers["www-authenticate"] == "Basic"
     assert app_with_auth.status_code == 200
-    assert "OfferForge" in app_with_auth.text
+    assert "SkillLoop" in app_with_auth.text
 
 
 async def test_app_page_does_not_break_docs_and_openapi_auth(

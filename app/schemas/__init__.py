@@ -1,4 +1,4 @@
-"""Pydantic schemas for OfferForge."""
+"""Pydantic schemas for SkillLoop."""
 
 from app.schemas.answer_arena import (
     ANSWER_SCORE_DIMENSIONS,

@@ -1,1 +1,1 @@
-"""Server-rendered web pages for OfferForge."""
+"""Server-rendered web pages for SkillLoop."""

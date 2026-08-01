@@ -1,6 +1,8 @@
-# OfferForge
+# SkillLoop
 
-OfferForge 是一个本地优先的 Web 应用，用于把 Python、SQL、API/pytest、UI 自动化、项目与面试输出等高频能力做成长期可调用的复习与训练工具。产品范围来自 `offerforge_scope.md`，但不会设计成固定按 Day 1、Day 2 推进的课程表。
+SkillLoop 是一个本地优先的 Web 应用，用于把 Python、SQL、API/pytest、UI 自动化、项目与面试输出等高频能力做成长期可调用的复习与训练工具。产品范围来自 `offerforge_scope.md`，但不会设计成固定按 Day 1、Day 2 推进的课程表。
+
+产品已从 OfferForge 更名为 SkillLoop。为避免破坏现有部署和数据，GitHub 仓库地址、`data/offerforge.db` 文件名及 `OFFERFORGE_*` 环境变量别名暂时保留；新配置应优先使用 `SKILLLOOP_*`。
 
 ## 当前完成范围
 
@@ -91,13 +93,13 @@ http://127.0.0.1:8000/docs
 开启 Basic Auth：
 
 ```powershell
-$env:OFFERFORGE_AUTH_ENABLED="true"
-$env:OFFERFORGE_AUTH_USERNAME="offerforge"
-$env:OFFERFORGE_AUTH_PASSWORD="请换成你自己的强密码"
+$env:SKILLLOOP_AUTH_ENABLED="true"
+$env:SKILLLOOP_AUTH_USERNAME="skillloop"
+$env:SKILLLOOP_AUTH_PASSWORD="请换成你自己的强密码"
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-如果 `OFFERFORGE_AUTH_ENABLED=true`，但没有设置用户名或密码，应用会拒绝启动。云端部署必须开启 Basic Auth。
+如果 `SKILLLOOP_AUTH_ENABLED=true`，但没有设置用户名或密码，应用会拒绝启动。云端部署必须开启 Basic Auth。
 
 开启后，`/docs`、`/openapi.json` 和业务 API 需要认证；`/api/v1/health` 保持开放，便于健康检查。
 
@@ -133,7 +135,7 @@ API 文档地址：
 http://192.168.1.8:8000/docs
 ```
 
-电脑上的 OfferForge 服务必须保持运行。第一次监听局域网地址时，Windows 防火墙可能弹出授权提示，需要允许 Python 在当前可信私人网络中通信。
+电脑上的 SkillLoop 服务必须保持运行。第一次监听局域网地址时，Windows 防火墙可能弹出授权提示，需要允许 Python 在当前可信私人网络中通信。
 
 ## 数据保存位置
 
@@ -147,7 +149,7 @@ data/offerforge.db
 
 ## Database configuration
 
-By default OfferForge uses local SQLite at `data/offerforge.db`. For an external database, set `OFFERFORGE_DATABASE_URL` or `DATABASE_URL`; priority is `OFFERFORGE_DATABASE_URL` > `DATABASE_URL` > local SQLite. PostgreSQL URLs such as `postgresql://...` are supported for hosted databases such as Neon. Do not commit real database URLs, usernames, passwords, or `.env` files.
+By default SkillLoop continues to use local SQLite at `data/offerforge.db` to preserve existing data. For an external database, set `SKILLLOOP_DATABASE_URL` or `DATABASE_URL`; priority is `SKILLLOOP_DATABASE_URL` > legacy `OFFERFORGE_DATABASE_URL` > `DATABASE_URL` > local SQLite. PostgreSQL URLs such as `postgresql://...` are supported for hosted databases such as Neon. Do not commit real database URLs, usernames, passwords, or `.env` files.
 
 External database connections use SQLAlchemy pool pre-ping to reduce stale idle connection failures after cloud database sleep or redeploy cycles.
 
@@ -165,7 +167,7 @@ Cloud MVP smoke test record: [`docs/CLOUD_SMOKE_TEST.md`](docs/CLOUD_SMOKE_TEST.
 
 HTTP Basic Auth 只是私人 MVP 的最小保护，不是完整账号系统。不要把密码写进代码，不要提交 `.env`，不要公开分享访问地址和密码。当前没有多用户账号、注册、登录会话或权限管理。
 
-本地开发默认关闭 Basic Auth；云端部署必须设置 `OFFERFORGE_AUTH_ENABLED=true`、`OFFERFORGE_AUTH_USERNAME` 和 `OFFERFORGE_AUTH_PASSWORD`。
+本地开发默认关闭 Basic Auth；云端部署必须设置 `SKILLLOOP_AUTH_ENABLED=true`、`SKILLLOOP_AUTH_USERNAME` 和 `SKILLLOOP_AUTH_PASSWORD`。
 
 只建议在可信的家庭、私人局域网或受保护的私人云端环境中使用。不要在公共 Wi-Fi 中开放，不要在路由器中设置公网端口映射，也不要把未开启认证的服务暴露到公网。
 
@@ -206,8 +208,8 @@ Bulk card import is available through `POST /api/v1/cards/bulk` with a JSON arra
 
 Practice history: `/app` can show recent practice attempts, including rating, user answer, card information, and next review time.
 Answer Arena V0.1: `/app` supports rule-based answer scoring before submitting a practice rating.
-Answer Arena V0.2: rule scoring remains the default; optional AI scoring uses `mode=ai` with `OFFERFORGE_AI_SCORE_BACKEND=openai|openrouter`. OpenAI uses `OPENAI_API_KEY`; OpenRouter uses `OPENROUTER_API_KEY`, `OFFERFORGE_OPENROUTER_MODEL`, optional `OFFERFORGE_OPENROUTER_SITE_URL`, and `OFFERFORGE_OPENROUTER_APP_TITLE`. Scores are not saved and scheduling is unchanged.
-Answer Arena V0.3: AI scoring also returns example-first coaching fields, including missing points, a complete answer, concrete examples, 60s/30s spoken answers, follow-up questions with short answers, and the next practice step. Full-answer mode is longer; set `OFFERFORGE_AI_SCORE_TIMEOUT_SECONDS=90` for hosted AI scoring.
+Answer Arena V0.2: rule scoring remains the default; optional AI scoring uses `mode=ai` with `SKILLLOOP_AI_SCORE_BACKEND=openai|openrouter`. OpenAI uses `OPENAI_API_KEY`; OpenRouter uses `OPENROUTER_API_KEY`, `SKILLLOOP_OPENROUTER_MODEL`, optional `SKILLLOOP_OPENROUTER_SITE_URL`, and `SKILLLOOP_OPENROUTER_APP_TITLE`. Scores are not saved and scheduling is unchanged.
+Answer Arena V0.3: AI scoring also returns example-first coaching fields, including missing points, a complete answer, concrete examples, 60s/30s spoken answers, follow-up questions with short answers, and the next practice step. Full-answer mode is longer; set `SKILLLOOP_AI_SCORE_TIMEOUT_SECONDS=90` for hosted AI scoring.
 Answer Arena V0.4: scoring is candidate-aware for the user's test-development/SDET transition profile. Use `mode=rule` for local fast scoring, `mode=ai_quick` for daily OpenAI/OpenRouter quick feedback with a 30s frontend timeout, and `mode=ai_deep` for full coaching with a 90s frontend timeout. Legacy `mode=ai` maps to quick feedback.
 
 Card editing: `/app` supports editing card title, question, core knowledge, reference answer, and tags.
@@ -220,7 +222,7 @@ The `/app` review queue also considers categories practiced earlier today, so he
 
 ## Scheduling rules
 
-OfferForge uses the five rating buttons to schedule the next review. `dont_know` and `with_hint` return in 1 day, `correct_slow` returns in about 2 days, `correct_explain` returns in about 4 days, and `transfer` stretches across 7 / 14 / 30 / 60 days as the consecutive correct count grows. Repeated transfer can promote a card to mastered, while a failed or hinted answer drops it back to learning. Balanced Review Queue only sorts today's eligible cards and does not change these scheduling rules.
+SkillLoop uses the five rating buttons to schedule the next review. `dont_know` and `with_hint` return in 1 day, `correct_slow` returns in about 2 days, `correct_explain` returns in about 4 days, and `transfer` stretches across 7 / 14 / 30 / 60 days as the consecutive correct count grows. Repeated transfer can promote a card to mastered, while a failed or hinted answer drops it back to learning. Balanced Review Queue only sorts today's eligible cards and does not change these scheduling rules.
 
 ## Review debug info
 
@@ -231,7 +233,7 @@ The `/app` page shows each card's mastery state, consecutive correct count, erro
 Week one interview seed cards are available at `data_seed/cards_seed_week1_interview_v3.json`.
 The file contains 95 cards for interview replay, resume projects, debugging, UI automation, Python coding, SQL, Linux, and HR practice. It is designed for import through `POST /api/v1/cards/bulk` and does not contain sensitive information.
 
-`data_seed/cards_seed_week1_interview_v4.json` is an upgraded interview-practice seed with more oral reference answers, memory structure, and follow-up defense notes. The v3 seed remains available, and v4 does not automatically overwrite existing online cards. To use v4 online, import it later through bulk import or switch `OFFERFORGE_AUTO_SEED_PATH`, taking care not to mix old and new card sets unintentionally.
+`data_seed/cards_seed_week1_interview_v4.json` is an upgraded interview-practice seed with more oral reference answers, memory structure, and follow-up defense notes. The v3 seed remains available, and v4 does not automatically overwrite existing online cards. To use v4 online, import it later through bulk import or switch `SKILLLOOP_AUTO_SEED_PATH`, taking care not to mix old and new card sets unintentionally.
 
 `data_seed/cards_seed_smartmore_interview_v1.json` contains 15 SmartMore interview review cards focused on AI tool usage, UI automation, business testing, career direction, and role matching.
 
@@ -241,11 +243,11 @@ The file contains 95 cards for interview replay, resume projects, debugging, UI 
 
 ## Auto seed restore
 
-On startup, OfferForge can auto-import `data_seed/cards_seed_week1_interview_v3.json` when the knowledge card table is empty. This helps restore the 95-card seed set after a Render free-environment redeploy or restart clears SQLite data. Existing cards are never duplicated, and this only restores knowledge cards, not practice attempts or today-done records. Auto seed is best-effort: missing files, validation failures, or import errors are logged and should not block health checks. Set `OFFERFORGE_AUTO_SEED_ON_STARTUP=false` to disable it, or override the file with `OFFERFORGE_AUTO_SEED_PATH`.
+On startup, SkillLoop can auto-import `data_seed/cards_seed_week1_interview_v3.json` when the knowledge card table is empty. This helps restore the 95-card seed set after a Render free-environment redeploy or restart clears SQLite data. Existing cards are never duplicated, and this only restores knowledge cards, not practice attempts or today-done records. Auto seed is best-effort: missing files, validation failures, or import errors are logged and should not block health checks. Set `SKILLLOOP_AUTO_SEED_ON_STARTUP=false` to disable it, or override the file with `SKILLLOOP_AUTO_SEED_PATH`.
 
 ## Playwright E2E Tests
 
-OfferForge includes a small Playwright Test suite written in TypeScript.
+SkillLoop includes a small Playwright Test suite written in TypeScript.
 
 Current coverage:
 

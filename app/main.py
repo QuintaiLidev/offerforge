@@ -72,7 +72,7 @@ def start_auto_seed_background(settings: Settings) -> Thread | None:
     thread = Thread(
         target=_run_auto_seed_background,
         args=(settings,),
-        name="offerforge-auto-seed",
+        name="skillloop-auto-seed",
         daemon=True,
     )
     thread.start()

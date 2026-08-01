@@ -1,4 +1,4 @@
-"""Repository layer for OfferForge persistence operations."""
+"""Repository layer for SkillLoop persistence operations."""
 
 from app.repositories.knowledge_card import KnowledgeCardRepository
 from app.repositories.practice_attempt import PracticeAttemptRepository

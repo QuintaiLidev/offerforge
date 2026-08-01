@@ -1,1 +1,1 @@
-"""API package for OfferForge."""
+"""API package for SkillLoop."""

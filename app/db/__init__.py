@@ -1,1 +1,1 @@
-"""Database package for OfferForge."""
+"""Database package for SkillLoop."""

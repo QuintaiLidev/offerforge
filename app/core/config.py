@@ -1,23 +1,26 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
-from typing import Mapping
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parents[2]
+# Keep the legacy filename so existing local and hosted deployments continue to
+# use the same database after the product rename.
 DEFAULT_DATABASE_PATH: Path = PROJECT_ROOT / "data" / "offerforge.db"
 DEFAULT_AUTO_SEED_PATH: Path = (
     PROJECT_ROOT / "data_seed" / "cards_seed_week1_interview_v3.json"
 )
+PRODUCT_NAME = "SkillLoop"
 
 
 class Settings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    app_name: str = "OfferForge"
+    app_name: str = PRODUCT_NAME
     api_v1_prefix: str = "/api/v1"
     database_path: Path = DEFAULT_DATABASE_PATH
     database_url_override: str | None = None
@@ -36,7 +39,7 @@ class Settings(BaseModel):
     openrouter_api_key: str | None = None
     openrouter_model: str = "openai/gpt-4o-mini"
     openrouter_site_url: str | None = None
-    openrouter_app_title: str = "OfferForge"
+    openrouter_app_title: str = PRODUCT_NAME
     ai_score_timeout_seconds: int = 20
 
     @field_validator("database_path", mode="after")
@@ -78,7 +81,7 @@ class Settings(BaseModel):
 
         normalized = value.strip().lower()
         if normalized not in {"rule", "ai"}:
-            raise ValueError("OFFERFORGE_AI_SCORE_PROVIDER must be rule or ai.")
+            raise ValueError("SKILLLOOP_AI_SCORE_PROVIDER must be rule or ai.")
         return normalized
 
     @field_validator("ai_score_backend", mode="before")
@@ -91,7 +94,7 @@ class Settings(BaseModel):
 
         normalized = value.strip().lower()
         if normalized not in {"openai", "openrouter"}:
-            raise ValueError("OFFERFORGE_AI_SCORE_BACKEND must be openai or openrouter.")
+            raise ValueError("SKILLLOOP_AI_SCORE_BACKEND must be openai or openrouter.")
         return normalized
 
     @field_validator("openai_api_key", mode="before")
@@ -138,7 +141,7 @@ class Settings(BaseModel):
     @classmethod
     def normalize_openrouter_app_title(cls, value: object) -> object:
         if value is None:
-            return "OfferForge"
+            return PRODUCT_NAME
         if not isinstance(value, str):
             return value
         stripped = value.strip()
@@ -148,17 +151,17 @@ class Settings(BaseModel):
     @classmethod
     def validate_ai_score_timeout_seconds(cls, value: int) -> int:
         if value <= 0:
-            raise ValueError("OFFERFORGE_AI_SCORE_TIMEOUT_SECONDS must be positive.")
+            raise ValueError("SKILLLOOP_AI_SCORE_TIMEOUT_SECONDS must be positive.")
         return value
 
     @model_validator(mode="after")
-    def validate_auth_credentials(self) -> "Settings":
+    def validate_auth_credentials(self) -> Settings:
         if self.auth_enabled and (
             not self.auth_username or not self.auth_password
         ):
             raise ValueError(
-                "Auth is enabled but OFFERFORGE_AUTH_USERNAME or "
-                "OFFERFORGE_AUTH_PASSWORD is missing."
+                "Auth is enabled but SKILLLOOP_AUTH_USERNAME or "
+                "SKILLLOOP_AUTH_PASSWORD is missing."
             )
         return self
 
@@ -187,49 +190,67 @@ def _read_int(value: str | None, default: int) -> int:
     return int(value)
 
 
+def _read_product_env(
+    environ: Mapping[str, str],
+    suffix: str,
+    default: str | None = None,
+) -> str | None:
+    """Read a SkillLoop setting with an OfferForge compatibility fallback."""
+    for prefix in ("SKILLLOOP", "OFFERFORGE"):
+        value = environ.get(f"{prefix}_{suffix}")
+        if value is not None and value.strip():
+            return value
+    return default
+
+
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if environ is None else environ
-    testing = _read_bool(env.get("OFFERFORGE_TESTING"), False)
-    database_url_override = env.get("OFFERFORGE_DATABASE_URL") or env.get(
+    testing = _read_bool(_read_product_env(env, "TESTING"), False)
+    database_url_override = _read_product_env(env, "DATABASE_URL") or env.get(
         "DATABASE_URL"
     )
 
     return Settings(
-        app_name=env.get("OFFERFORGE_APP_NAME", "OfferForge"),
-        api_v1_prefix=env.get("OFFERFORGE_API_V1_PREFIX", "/api/v1"),
+        app_name=_read_product_env(env, "APP_NAME", PRODUCT_NAME) or PRODUCT_NAME,
+        api_v1_prefix=_read_product_env(env, "API_V1_PREFIX", "/api/v1")
+        or "/api/v1",
         database_path=Path(
-            env.get("OFFERFORGE_DATABASE_PATH", str(DEFAULT_DATABASE_PATH))
+            _read_product_env(env, "DATABASE_PATH", str(DEFAULT_DATABASE_PATH))
+            or str(DEFAULT_DATABASE_PATH)
         ),
         database_url_override=database_url_override,
         testing=testing,
-        host=env.get("OFFERFORGE_HOST", "127.0.0.1"),
-        port=_read_int(env.get("OFFERFORGE_PORT"), 8000),
-        auth_enabled=_read_bool(env.get("OFFERFORGE_AUTH_ENABLED"), False),
-        auth_username=env.get("OFFERFORGE_AUTH_USERNAME") or None,
-        auth_password=env.get("OFFERFORGE_AUTH_PASSWORD") or None,
+        host=_read_product_env(env, "HOST", "127.0.0.1") or "127.0.0.1",
+        port=_read_int(_read_product_env(env, "PORT"), 8000),
+        auth_enabled=_read_bool(_read_product_env(env, "AUTH_ENABLED"), False),
+        auth_username=_read_product_env(env, "AUTH_USERNAME") or None,
+        auth_password=_read_product_env(env, "AUTH_PASSWORD") or None,
         auto_seed_on_startup=_read_bool(
-            env.get("OFFERFORGE_AUTO_SEED_ON_STARTUP"),
+            _read_product_env(env, "AUTO_SEED_ON_STARTUP"),
             not testing,
         ),
         auto_seed_path=Path(
-            env.get("OFFERFORGE_AUTO_SEED_PATH", str(DEFAULT_AUTO_SEED_PATH))
+            _read_product_env(env, "AUTO_SEED_PATH", str(DEFAULT_AUTO_SEED_PATH))
+            or str(DEFAULT_AUTO_SEED_PATH)
         ),
-        ai_score_provider=env.get("OFFERFORGE_AI_SCORE_PROVIDER", "rule"),
-        ai_score_backend=env.get("OFFERFORGE_AI_SCORE_BACKEND", "openai"),
+        ai_score_provider=_read_product_env(env, "AI_SCORE_PROVIDER", "rule"),
+        ai_score_backend=_read_product_env(env, "AI_SCORE_BACKEND", "openai"),
         openai_api_key=env.get("OPENAI_API_KEY") or None,
-        openai_model=env.get("OFFERFORGE_OPENAI_MODEL", "gpt-4o-mini"),
+        openai_model=_read_product_env(env, "OPENAI_MODEL", "gpt-4o-mini"),
         openrouter_api_key=env.get("OPENROUTER_API_KEY") or None,
-        openrouter_model=env.get(
-            "OFFERFORGE_OPENROUTER_MODEL",
+        openrouter_model=_read_product_env(
+            env,
+            "OPENROUTER_MODEL",
             "openai/gpt-4o-mini",
         ),
-        openrouter_site_url=env.get("OFFERFORGE_OPENROUTER_SITE_URL") or None,
-        openrouter_app_title=env.get(
-            "OFFERFORGE_OPENROUTER_APP_TITLE",
-            "OfferForge",
+        openrouter_site_url=_read_product_env(env, "OPENROUTER_SITE_URL") or None,
+        openrouter_app_title=_read_product_env(
+            env,
+            "OPENROUTER_APP_TITLE",
+            PRODUCT_NAME,
         ),
         ai_score_timeout_seconds=_read_int(
-            env.get("OFFERFORGE_AI_SCORE_TIMEOUT_SECONDS"),
+            _read_product_env(env, "AI_SCORE_TIMEOUT_SECONDS"),
             20,
         ),
     )

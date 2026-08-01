@@ -1,4 +1,4 @@
-"""Service-layer exports for OfferForge."""
+"""Service-layer exports for SkillLoop."""
 
 from app.services.exceptions import (
     AiScoringInvalidResponseError,

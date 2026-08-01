@@ -1,4 +1,4 @@
-"""SQLAlchemy model registrations for OfferForge."""
+"""SQLAlchemy model registrations for SkillLoop."""
 
 from app.models.enums import (
     DifficultyLevel,

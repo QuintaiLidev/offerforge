@@ -101,7 +101,7 @@ class AnswerScoreProvider(Protocol):
         user_answer: str,
         depth: ScoringDepth = "quick",
     ) -> AnswerScoreResponse:
-        """Score an answer without mutating OfferForge state."""
+        """Score an answer without mutating SkillLoop state."""
 
 
 class AnswerArenaService:

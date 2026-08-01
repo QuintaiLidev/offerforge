@@ -1,5 +1,5 @@
 [project]
-name = "offerforge"
+name = "skillloop"
 version = "0.1.0"
 description = "Local-first web application for adaptive SDET interview practice."
 requires-python = ">=3.11"
